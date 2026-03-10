@@ -1,6 +1,8 @@
 name: spatial-ci
 channels:
   - conda-forge
+  - pytorch
+  - defaults
 dependencies:
   - python=3.11
   - pip
@@ -13,34 +15,24 @@ dependencies:
   - anndata>=0.10,<0.12
   - scanpy>=1.10,<2
   - pillow>=10,<12
-
-  # Imaging / pathology IO
+  - scikit-learn
   - openslide
   - openslide-python
-
-  # PyTorch
   - pytorch>=2.4,<3
   - torchvision>=0.19,<1
-
-  # R side for singscore
+  - click
+  - tqdm
+  - rich
   - r-base>=4.3,<4.5
   - r-renv
   - r-devtools
   - r-remotes
   - bioconductor-biocmanager
-
-  # Dev tools
   - pytest>=8,<9
   - pytest-cov>=5,<6
   - ruff>=0.6,<1
   - mypy>=1.11,<2
-
-  # Optional Bayesian stack
+  - hypothesis>=6.151.9
   - pymc>=5,<6
-
-  # Linux-only GPU acceleration can be added in a separate env
-  # or installed conditionally in CI / local Linux nodes.
-  # - cucim==23.10.0
-
   - pip:
-      - -e .
+    - -e .

@@ -95,22 +95,33 @@ Cohort-dependent scoring is not allowed in the main frozen target definition.
 ### Scoring family
 - **single-sample, rank-based scoring**
 
+### Preferred implementation direction
+- **R/Bioconductor `singscore`**
+
 ### Implementation
-- **R/Bioconductor singscore**
-- Environment frozen by `renv.lock`
+- **R/Bioconductor `singscore`**
+- environment frozen by `renv.lock`
 
 ### The contract must freeze
-- scoring implementation: R/Bioconductor singscore
-- environment lockfile: renv.lock (with hash)
+- package name and source
+- package version / Bioconductor release
+- environment lock provenance (for example `renv.lock`)
 - scoring variant
 - tie-breaking behavior
-- missing-gene policy
+- missing-gene behavior
+- output artifact format and provenance fields
 
 ### Architecture note
-Target scoring is performed in R, producing score artifacts that are consumed by Python downstream. This cross-language boundary is explicit in the architecture.
+Target scoring is performed in R, producing score artifacts that are consumed by
+Python downstream. This cross-language boundary is explicit in the
+architecture.
 
 ### v1 rationale
-We explicitly moved away from cohort-dependent methods such as `scanpy_score_genes` for the primary frozen target definition.
+We explicitly moved away from cohort-dependent methods such as
+`scanpy_score_genes` for the primary frozen target definition. The current v1
+direction is to treat R/Bioconductor `singscore` as the authoritative scoring
+implementation and to freeze that boundary through lockfile-backed provenance
+rather than a Python package commit pin.
 
 ---
 
