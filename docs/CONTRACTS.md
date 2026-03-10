@@ -95,15 +95,19 @@ Cohort-dependent scoring is not allowed in the main frozen target definition.
 ### Scoring family
 - **single-sample, rank-based scoring**
 
-### Preferred implementation direction
-- **PySingscore** pinned by exact git commit SHA
+### Implementation
+- **R/Bioconductor singscore**
+- Environment frozen by `renv.lock`
 
 ### The contract must freeze
-- package/repository
-- exact commit SHA
+- scoring implementation: R/Bioconductor singscore
+- environment lockfile: renv.lock (with hash)
 - scoring variant
 - tie-breaking behavior
-- missing-gene behavior
+- missing-gene policy
+
+### Architecture note
+Target scoring is performed in R, producing score artifacts that are consumed by Python downstream. This cross-language boundary is explicit in the architecture.
 
 ### v1 rationale
 We explicitly moved away from cohort-dependent methods such as `scanpy_score_genes` for the primary frozen target definition.
