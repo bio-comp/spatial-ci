@@ -21,7 +21,10 @@ if (file.exists("renv.lock")) {
   }
   
   # singscore and dependencies
-  BiocManager::install(c("singscore", "SummarizedExperiment", "arrow", "optparse"), update = FALSE)
+  BiocManager::install(
+    c("singscore", "SummarizedExperiment", "arrow", "jsonlite", "optparse"),
+    update = FALSE
+  )
   
   # Save the current state to renv.lock
   renv::snapshot(type = "all")

@@ -4,22 +4,35 @@ channels:
   - pytorch
   - defaults
 dependencies:
-  - python=3.10
+  - python=3.11
   - pip
-  - polars
-  - pydantic
-  - pyarrow
-  - numpy
-  - scipy
+  - numpy>=1.26,<3
+  - scipy>=1.13,<2
+  - pandas>=2.2,<3
+  - polars>=1.8,<2
+  - pyarrow>=17,<20
+  - pydantic>=2.8,<3
+  - anndata>=0.10,<0.12
+  - scanpy>=1.10,<2
+  - pillow>=10,<12
   - scikit-learn
-  - pytorch
-  - torchvision
   - openslide
   - openslide-python
+  - pytorch>=2.4,<3
+  - torchvision>=0.19,<1
   - click
   - tqdm
   - rich
-  - r-base=4.3
+  - r-base>=4.3,<4.5
   - r-renv
+  - r-devtools
+  - r-remotes
+  - bioconductor-biocmanager
+  - pytest>=8,<9
+  - pytest-cov>=5,<6
+  - ruff>=0.6,<1
+  - mypy>=1.11,<2
+  - hypothesis>=6.151.9
+  - pymc>=5,<6
   - pip:
     - -e .

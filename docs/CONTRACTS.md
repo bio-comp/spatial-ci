@@ -98,6 +98,10 @@ Cohort-dependent scoring is not allowed in the main frozen target definition.
 ### Preferred implementation direction
 - **R/Bioconductor `singscore`**
 
+### Implementation
+- **R/Bioconductor `singscore`**
+- environment frozen by `renv.lock`
+
 ### The contract must freeze
 - package name and source
 - package version / Bioconductor release
@@ -106,6 +110,11 @@ Cohort-dependent scoring is not allowed in the main frozen target definition.
 - tie-breaking behavior
 - missing-gene behavior
 - output artifact format and provenance fields
+
+### Architecture note
+Target scoring is performed in R, producing score artifacts that are consumed by
+Python downstream. This cross-language boundary is explicit in the
+architecture.
 
 ### v1 rationale
 We explicitly moved away from cohort-dependent methods such as

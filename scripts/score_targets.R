@@ -1,51 +1,40 @@
 #!/usr/bin/env Rscript
 
-# score_targets.R
-# Source-of-truth implementation for target scoring using R/Bioconductor singscore.
-# Consumes expression artifacts from Python, scores targets, and writes Parquet results.
+suppressPackageStartupMessages({
+  library(singscore)
+  library(jsonlite)
+})
 
-library(optparse)
+args <- commandArgs(trailingOnly = TRUE)
 
-# Parse command line arguments
-option_list <- list(
-  make_option(c("-i", "--input"), type="character", default=NULL, help="Path to input expression artifact (e.g., .h5ad or Parquet)", metavar="character"),
-  make_option(c("-o", "--output"), type="character", default=NULL, help="Path to output Parquet score artifact", metavar="character"),
-  make_option(c("-t", "--target_id"), type="character", default=NULL, help="Target definition ID", metavar="character"),
-  make_option(c("-c", "--contract_id"), type="character", default=NULL, help="Scoring contract ID", metavar="character")
-)
-
-opt_parser <- OptionParser(option_list=option_list)
-opt <- parse_args(opt_parser)
-
-if (is.null(opt$input) || is.null(opt$output)) {
-  print_help(opt_parser)
-  stop("Missing input or output path.", call.=FALSE)
+if (length(args) < 3) {
+  stop("Usage: Rscript scripts/score_targets.R <input_csv> <geneset_json> <output_csv>")
 }
 
-# Placeholder for singscore implementation
-# This will involve loading the expression data, mapping genes to target programs,
-# and running the singscore calculation.
+input_csv <- args[[1]]
+geneset_json <- args[[2]]
+output_csv <- args[[3]]
 
-message("Scoring targets for input: ", opt$input)
-message("Output will be saved to: ", opt$output)
+expr <- read.csv(input_csv, row.names = 1, check.names = FALSE)
+genesets <- fromJSON(geneset_json)
 
-# Example singscore workflow:
-# 1. Load expression data (e.g., via arrow::read_parquet or SummarizedExperiment)
-# 2. Define gene sets (from TargetDefinition)
-# 3. Calculate stable ranks
-# 4. Calculate scores for each program
-# 5. Write results to Parquet
+score_one <- function(mat, genes) {
+  present <- intersect(genes, rownames(mat))
+  missing_fraction <- 1 - (length(present) / length(genes))
 
-# library(singscore)
-# library(arrow)
+  if (missing_fraction > 0.10) {
+    return(rep(NA_real_, ncol(mat)))
+  }
 
-# Dummy output for now to demonstrate success
-# results <- data.frame(
-#   spot_id = "placeholder_spot_1",
-#   HALLMARK_HYPOXIA = 0.5,
-#   HALLMARK_G2M_CHECKPOINT = 0.3,
-#   HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION = 0.2
-# )
-# arrow::write_parquet(results, opt$output)
+  # singscore expects genes x samples
+  scores <- simpleScore(mat[present, , drop = FALSE], upSet = present, centerScore = FALSE)
+  return(scores$TotalScore)
+}
 
-message("Target scoring complete.")
+out <- data.frame(sample_id = colnames(expr))
+
+for (program_name in names(genesets)) {
+  out[[program_name]] <- score_one(expr, genesets[[program_name]])
+}
+
+write.csv(out, output_csv, row.names = FALSE)
