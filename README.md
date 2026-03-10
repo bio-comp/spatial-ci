@@ -304,12 +304,15 @@ Suggested subtitle:
 
 ## Repository structure
 
-```text
+```
 spatial-ci/
 ├── README.md
 ├── LICENSE
 ├── pyproject.toml
 ├── uv.lock
+├── renv.lock
+├── .Rprofile
+├── environment.yml
 ├── docs/
 │   ├── CONTRACTS.md
 │   ├── EVALUATION.md
@@ -331,7 +334,8 @@ spatial-ci/
 │       └── utils/
 ├── scripts/
 │   ├── build_manifest.py
-│   ├── score_targets.py
+│   ├── score_targets.R
+│   ├── bootstrap_renv.R
 │   ├── run_baselines.py
 │   └── evaluate_run.py
 └── tests/
