@@ -1,0 +1,25 @@
+name: spatial-ci
+channels:
+  - conda-forge
+  - pytorch
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - polars
+  - pydantic
+  - pyarrow
+  - numpy
+  - scipy
+  - scikit-learn
+  - pytorch
+  - torchvision
+  - openslide
+  - openslide-python
+  - click
+  - tqdm
+  - rich
+  - r-base=4.3
+  - r-renv
+  - pip:
+    - -e .
