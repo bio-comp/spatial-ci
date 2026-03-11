@@ -1,6 +1,11 @@
 from pydantic import ValidationError
 
-from spatial_ci.scoring.artifacts import ScoreArtifact, ScorePacket, ScoreStatus
+from spatial_ci.scoring.artifacts import (
+    ScoreArtifact,
+    ScorePacket,
+    ScoreStatus,
+    SignatureDirection,
+)
 
 
 def test_score_packet_requires_observation_grain() -> None:
@@ -28,7 +33,7 @@ def test_score_artifact_keeps_provenance_off_rows() -> None:
     artifact = ScoreArtifact(
         target_definition_id="breast_visium_hallmarks_v1",
         scoring_contract_id="singscore_r_v1",
-        signature_direction="up_only",
+        signature_direction=SignatureDirection.UP_ONLY,
         bridge_contract_version="v1",
         generated_at="2026-03-10T00:00:00Z",
         run_id="run-1",

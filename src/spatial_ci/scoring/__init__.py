@@ -2,7 +2,6 @@
 
 from spatial_ci.scoring.api import (
     CalibrationStatus,
-    MissingGenePolicy,
     ReferencePopulation,
     ReferencePopulationKind,
     RobustCalibrationResult,
@@ -10,32 +9,25 @@ from spatial_ci.scoring.api import (
     ScoreFailureCode,
     ScorePacket,
     ScorePacketAdapter,
-    ScoreResult,
     ScoreStatus,
     SignatureDirection,
-    TiePolicy,
     robust_calibrate_scores,
     score_batch,
     score_one,
-    singscore,
 )
 
 __all__ = [
     "CalibrationStatus",
-    "MissingGenePolicy",
     "ReferencePopulation",
     "ReferencePopulationKind",
     "RobustCalibrationResult",
     "ScoreArtifact",
-    "ScoreResult",
     "ScoreFailureCode",
     "ScorePacket",
     "ScorePacketAdapter",
     "ScoreStatus",
     "SignatureDirection",
-    "TiePolicy",
     "robust_calibrate_scores",
     "score_batch",
     "score_one",
-    "singscore",
 ]
