@@ -1,0 +1,6 @@
+{
+  "bridge_contract_version": "v1",
+  "debug_mode": false,
+  "scoring_contract_id": "singscore_r_v1",
+  "target_definition_id": "breast_visium_hallmarks_v1"
+}

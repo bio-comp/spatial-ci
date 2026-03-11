@@ -162,6 +162,12 @@ dmypy.json
 # Local git worktrees
 .worktrees/
 
+# Local R state
+.r-lib/
+.Rhistory
+.RData
+.Ruserdata
+
 # Pyre type checker
 .pyre/
 
