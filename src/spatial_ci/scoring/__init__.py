@@ -15,6 +15,8 @@ from spatial_ci.scoring.api import (
     SignatureDirection,
     TiePolicy,
     robust_calibrate_scores,
+    score_batch,
+    score_one,
     singscore,
 )
 
@@ -33,5 +35,7 @@ __all__ = [
     "SignatureDirection",
     "TiePolicy",
     "robust_calibrate_scores",
+    "score_batch",
+    "score_one",
     "singscore",
 ]

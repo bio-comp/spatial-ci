@@ -19,6 +19,8 @@ from spatial_ci.scoring.singscore import (
     MissingGenePolicy,
     ScoreResult,
     TiePolicy,
+    score_batch,
+    score_one,
     singscore,
 )
 
@@ -37,5 +39,7 @@ __all__ = [
     "SignatureDirection",
     "TiePolicy",
     "robust_calibrate_scores",
+    "score_batch",
+    "score_one",
     "singscore",
 ]

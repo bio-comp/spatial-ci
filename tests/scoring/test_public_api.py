@@ -7,6 +7,8 @@ from spatial_ci.scoring import (
     ReferencePopulationKind,
     TiePolicy,
     robust_calibrate_scores,
+    score_batch,
+    score_one,
     singscore,
 )
 from spatial_ci.signatures import GeneSignature
@@ -25,6 +27,8 @@ def test_scoring_public_api_is_available() -> None:
         kind=ReferencePopulationKind.TRAINING,
         sample_ids=("spot_1", "spot_2", "spot_3"),
     ).sample_ids == ("spot_1", "spot_2", "spot_3")
+    assert callable(score_batch)
+    assert callable(score_one)
     assert callable(singscore)
     assert callable(robust_calibrate_scores)
 
