@@ -1,19 +1,19 @@
 """Small public API surface for extraction-friendly scoring code."""
 
+from spatial_ci.scoring.artifacts import (
+    ScoreArtifact,
+    ScoreFailureCode,
+    ScorePacket,
+    ScorePacketAdapter,
+    ScoreStatus,
+    SignatureDirection,
+)
 from spatial_ci.scoring.calibration import (
     CalibrationStatus,
     ReferencePopulation,
     ReferencePopulationKind,
     RobustCalibrationResult,
     robust_calibrate_scores,
-)
-from spatial_ci.scoring.packet import (
-    ScoreFailureCode,
-    ScorePacket,
-    ScorePacketAdapter,
-    SignatureCoverage,
-    SignatureDirectionality,
-    UncertaintyFlag,
 )
 from spatial_ci.scoring.singscore import (
     MissingGenePolicy,
@@ -28,14 +28,14 @@ __all__ = [
     "ReferencePopulation",
     "ReferencePopulationKind",
     "RobustCalibrationResult",
+    "ScoreArtifact",
     "ScoreResult",
     "ScoreFailureCode",
     "ScorePacket",
     "ScorePacketAdapter",
-    "SignatureCoverage",
-    "SignatureDirectionality",
+    "ScoreStatus",
+    "SignatureDirection",
     "TiePolicy",
-    "UncertaintyFlag",
     "robust_calibrate_scores",
     "singscore",
 ]

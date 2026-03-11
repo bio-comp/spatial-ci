@@ -1,56 +1,35 @@
 from collections.abc import Mapping
 
-import pytest
-from pydantic import ValidationError
-
-from spatial_ci.scoring import (
+from spatial_ci.scoring.artifacts import (
     ScoreFailureCode,
     ScorePacket,
     ScorePacketAdapter,
-    SignatureCoverage,
-    SignatureDirectionality,
-    UncertaintyFlag,
+    ScoreStatus,
 )
 from spatial_ci.signatures import GeneSignature
 
 
-def test_score_packet_supports_explicit_failure_codes_and_optional_fields() -> None:
+def test_score_packet_uses_observation_grain_and_status() -> None:
     packet = ScorePacket(
-        sample_id="spot_001",
-        signature_name="HALLMARK_HYPOXIA",
-        scorer_name="singscore",
-        signature_directionality=SignatureDirectionality.UP_ONLY,
-        raw_rank_evidence=0.42,
-        signature_coverage=SignatureCoverage(
-            genes_total=10,
-            genes_matched=8,
-            coverage_fraction=0.8,
-        ),
-        dropout_penalty=None,
+        observation_id="obs-1",
+        sample_id="sample-1",
+        slide_id="slide-1",
+        program_name="HALLMARK_HYPOXIA",
+        status=ScoreStatus.OK,
+        raw_rank_evidence=0.25,
+        signature_size_declared=4,
+        signature_size_matched=4,
+        signature_coverage=1.0,
+        dropped_by_missingness_rule=False,
+        failure_code=None,
         null_calibrated_score=None,
+        dropout_penalty=None,
         spatial_consistency=None,
-        uncertainty_flag=UncertaintyFlag.HIGH,
-        failure_codes=(
-            ScoreFailureCode.MISSING_DATA,
-            ScoreFailureCode.NULL_CALIBRATION_MISSING,
-        ),
     )
 
-    assert packet.sample_id == "spot_001"
-    assert packet.signature_coverage.coverage_fraction == pytest.approx(0.8)
-    assert packet.failure_codes == (
-        ScoreFailureCode.MISSING_DATA,
-        ScoreFailureCode.NULL_CALIBRATION_MISSING,
-    )
-
-
-def test_signature_coverage_rejects_fraction_mismatch() -> None:
-    with pytest.raises(ValidationError, match="coverage_fraction"):
-        SignatureCoverage(
-            genes_total=10,
-            genes_matched=8,
-            coverage_fraction=0.5,
-        )
+    assert packet.observation_id == "obs-1"
+    assert packet.program_name == "HALLMARK_HYPOXIA"
+    assert packet.status is ScoreStatus.OK
 
 
 def test_score_packet_adapter_protocol_exposes_packet_output() -> None:
@@ -60,34 +39,33 @@ def test_score_packet_adapter_protocol_exposes_packet_output() -> None:
         def score(
             self,
             *,
-            sample_id: str,
+            observation_id: str,
             expression_by_gene: Mapping[str, float],
             signature: GeneSignature,
         ) -> ScorePacket:
             return ScorePacket(
-                sample_id=sample_id,
-                signature_name=signature.name,
-                scorer_name=self.scorer_name,
-                signature_directionality=SignatureDirectionality.UP_ONLY,
-                raw_rank_evidence=0.1,
-                signature_coverage=SignatureCoverage(
-                    genes_total=2,
-                    genes_matched=2,
-                    coverage_fraction=1.0,
-                ),
-                dropout_penalty=0.0,
+                observation_id=observation_id,
+                sample_id=None,
+                slide_id=None,
+                program_name=signature.name,
+                status=ScoreStatus.DROPPED,
+                raw_rank_evidence=None,
+                signature_size_declared=2,
+                signature_size_matched=0,
+                signature_coverage=0.0,
+                dropped_by_missingness_rule=True,
+                failure_code=ScoreFailureCode.EMPTY_SIGNATURE_MATCH,
                 null_calibrated_score=None,
+                dropout_penalty=None,
                 spatial_consistency=None,
-                uncertainty_flag=UncertaintyFlag.NONE,
-                failure_codes=(),
             )
 
     adapter = DummyAdapter()
 
     assert isinstance(adapter, ScorePacketAdapter)
     packet = adapter.score(
-        sample_id="spot_002",
+        observation_id="obs-2",
         expression_by_gene={"CA9": 1.0, "VEGFA": 2.0},
         signature=GeneSignature(name="hypoxia", up_genes=("CA9", "VEGFA")),
     )
-    assert packet.scorer_name == "dummy"
+    assert packet.failure_code is ScoreFailureCode.EMPTY_SIGNATURE_MATCH
