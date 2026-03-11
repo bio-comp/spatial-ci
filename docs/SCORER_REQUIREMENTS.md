@@ -18,6 +18,8 @@ these properties:
      naturally equivalent.
 4. **Missing-gene accounting**
    - Coverage must be reported explicitly rather than hidden.
+   - Detected-gene membership must come from an explicit observation-level
+     artifact, not be inferred from `expression > 0`.
 5. **Directionality support**
    - Up-only and up/down signatures must be handled explicitly.
 6. **Spatial separation**
