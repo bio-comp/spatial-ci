@@ -1,10 +1,14 @@
 """Artifact schemas for the R-backed Spatial-CI scoring boundary."""
 
+import json
 import math
 from collections.abc import Mapping
 from enum import Enum
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from spatial_ci.signatures import GeneSignature
@@ -103,6 +107,38 @@ class ScoreArtifact(BaseModel):
     packets: tuple[ScorePacket, ...]
 
 
+def write_score_artifact(artifact: ScoreArtifact, path: Path) -> None:
+    """Write a score artifact to Parquet with artifact metadata in schema metadata."""
+
+    packet_rows = [packet.model_dump(mode="json") for packet in artifact.packets]
+    table = pa.Table.from_pylist(packet_rows)
+    artifact_metadata = artifact.model_dump(mode="json")
+    artifact_metadata.pop("packets")
+    schema_metadata = {
+        **(table.schema.metadata or {}),
+        b"spatial_ci_score_artifact": json.dumps(
+            artifact_metadata, sort_keys=True
+        ).encode("utf-8"),
+    }
+    pq.write_table(table.replace_schema_metadata(schema_metadata), path)
+
+
+def read_score_artifact(path: Path) -> ScoreArtifact:
+    """Read a score artifact from Parquet and reconstruct typed provenance and rows."""
+
+    table = pq.read_table(path)
+    schema_metadata = table.schema.metadata or {}
+    encoded_metadata = schema_metadata.get(b"spatial_ci_score_artifact")
+    if encoded_metadata is None:
+        raise ValueError(
+            "Parquet artifact is missing spatial_ci_score_artifact metadata."
+        )
+
+    artifact_metadata = json.loads(encoded_metadata.decode("utf-8"))
+    packets = tuple(ScorePacket.model_validate(row) for row in table.to_pylist())
+    return ScoreArtifact.model_validate({**artifact_metadata, "packets": packets})
+
+
 @runtime_checkable
 class ScorePacketAdapter(Protocol):
     """Protocol for scorers that emit score packets."""
@@ -125,4 +161,6 @@ __all__ = [
     "ScorePacketAdapter",
     "ScoreStatus",
     "SignatureDirection",
+    "read_score_artifact",
+    "write_score_artifact",
 ]
