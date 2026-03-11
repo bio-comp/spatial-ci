@@ -9,6 +9,14 @@ The current source-of-truth scoring boundary remains:
 - frozen through repo-level environment provenance
 - consumed by Spatial-CI as a deterministic score artifact
 
+For v1, the bridge contract is intentionally thin and explicit:
+- Python writes `expression_input.csv`, `signature_input.json`,
+  `scoring_request.json`, and `detected_membership.parquet`
+- R writes `score_output.parquet` and `runtime_metadata.json`
+- R owns only raw `singscore` numeric output
+- Python owns detected-membership coverage, drop policy, packet assembly, and
+  output invariants
+
 The near-term goal is not to launch a new standalone scoring package. The goal
 is to make Spatial-CI's scoring layer deterministic, benchmarkable, auditable,
 and parity-tested against the maintained R reference.
@@ -122,6 +130,10 @@ Current packet shape:
 This keeps the deterministic scorer, calibration, coverage accounting, and
 spatial agreement separate. A scorer adapter can emit `MISSING_DATA` for packet
 fields it cannot populate yet, but it must still honor the packet shape.
+
+Coverage is not inferred from `expression > 0`. It is computed from an explicit
+observation-level detected-membership artifact so zero-filling or matrix
+densification cannot silently redefine the missingness contract.
 
 ## Near-Term Work
 
