@@ -22,15 +22,15 @@ def assign_patient_splits(
     if not 0.0 < val_fraction < 1.0:
         raise ValueError("val_fraction must be strictly between 0 and 1")
 
-    holdout_cohorts = set(external_holdout_cohorts)
+    external_test_cohorts = set(external_holdout_cohorts)
     patient_rows = frame.select(["cohort_id", "resolved_patient_id"]).unique()
 
     assignments: list[dict[str, str]] = []
     for row in patient_rows.to_dicts():
         cohort_id = str(row["cohort_id"])
         resolved_patient_id = str(row["resolved_patient_id"])
-        if cohort_id in holdout_cohorts:
-            split = "holdout"
+        if cohort_id in external_test_cohorts:
+            split = "test_external"
         else:
             fraction = _stable_fraction(split_contract_id, resolved_patient_id)
             split = (
