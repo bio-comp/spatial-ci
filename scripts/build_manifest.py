@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
+# mypy: disable-error-code=untyped-decorator
 
 from pathlib import Path
 
 import click
+
+from spatial_ci.manifest.pipeline import build_split_assignments
 
 # build_manifest.py
 # Implements the two-pass manifest builder for Spatial-CI.
@@ -28,36 +31,23 @@ import click
 def main(config: Path, output: Path, allow_missing: bool) -> None:
     """Spatial-CI Two-Pass Manifest Builder."""
 
-    # ---------------------------------------------------------
-    # PASS 1: LOGICAL ASSIGNMENTS
-    # ---------------------------------------------------------
+    if allow_missing:
+        raise click.ClickException(
+            "--allow-missing is not implemented in the pass-1 split-foundation slice."
+        )
+
     click.secho("Starting Pass 1: Logical Assignments...", fg="cyan")
-
-    # TODO: Schema discovery and vocabulary normalization
-    # TODO: Cohort filtering
-    # TODO: Resolved ID construction (patient, specimen, slide)
-    # TODO: Deterministic split assignment using SplitContract
-    # TODO: Leakage audit (patient-level)
-
-    # Placeholder: dummy dataframe
-    # df_logical = pl.DataFrame(...)
-
-    # ---------------------------------------------------------
-    # PASS 2: PHYSICAL MATERIALIZATION
-    # ---------------------------------------------------------
-    click.secho("Starting Pass 2: Physical Materialization...", fg="cyan")
-
-    # TODO: Resolve actual artifacts on disk based on logical paths
-    # TODO: Pre-hash validation
-    # TODO: Compute hashes (SHA256)
-    # TODO: Validate final manifest rows (against Pydantic schemas)
-    # TODO: Write rejection ledgers for any failed spots/samples
-
-    # Placeholder: dummy materialize and write
-    # df_physical = df_logical.with_columns(...)
-    # df_physical.write_parquet(output)
-
-    click.secho(f"Manifest materialized successfully to: {output}", fg="green")
+    artifact = build_split_assignments(
+        config_path=config,
+        output_path=output,
+    )
+    click.secho(
+        (
+            "Split assignments written successfully to: "
+            f"{artifact.output_path}"
+        ),
+        fg="green",
+    )
 
 
 if __name__ == "__main__":

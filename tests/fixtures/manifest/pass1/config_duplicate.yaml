@@ -1,0 +1,14 @@
+sources:
+  - path: tests/fixtures/manifest/pass1/metadata_duplicate.csv
+    format: csv
+    field_map:
+      sample: sample_id
+      patient: patient_id
+      specimen: specimen_id
+      slide: slide_id
+    cohort_id: cohort-a
+split_contract:
+  split_contract_id: breast_visium_split_v1
+  val_fraction: 0.2
+  external_holdout_cohorts:
+    - external-a
