@@ -20,6 +20,7 @@ class SplitAssignmentArtifact(BaseModel):
 
     split_contract_id: str
     output_path: Path
+    leakage_report_path: Path | None = None
     rows: list[SplitAssignmentRow]
 
 
