@@ -32,3 +32,24 @@ def test_build_manifest_cli_writes_split_assignment_artifact(tmp_path: Path) -> 
     assert result.exit_code == 0
     assert output_path.exists()
     assert pl.read_parquet(output_path).height > 0
+
+
+def test_build_manifest_cli_fails_with_leakage_report(tmp_path: Path) -> None:
+    output_path = tmp_path / "assignments.parquet"
+    runner = CliRunner()
+    main = _load_build_manifest_main()
+    result = runner.invoke(
+        main,
+        [
+            "--config",
+            "tests/fixtures/manifest/pass1/config_leakage.yaml",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    leakage_path = output_path.with_suffix(".leakage.parquet")
+    assert result.exit_code != 0
+    assert "Leakage detected" in result.output
+    assert output_path.exists()
+    assert leakage_path.exists()
