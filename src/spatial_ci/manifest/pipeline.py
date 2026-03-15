@@ -12,6 +12,7 @@ from spatial_ci.manifest.config import (
     load_manifest_config,
 )
 from spatial_ci.manifest.identity import derive_resolved_identity
+from spatial_ci.manifest.leakage import build_leakage_report
 from spatial_ci.manifest.normalize import normalize_manifest_source
 from spatial_ci.manifest.splits import assign_patient_splits
 
@@ -88,6 +89,28 @@ def build_split_assignments(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_table.write_parquet(output_path)
 
+    leakage_report = build_leakage_report(
+        output_table,
+        split_contract_id=config.split_contract.split_contract_id,
+        report_path=output_path.with_suffix(".leakage.parquet"),
+    )
+    if leakage_report.n_findings > 0:
+        leakage_table = pl.DataFrame(
+            [row.model_dump() for row in leakage_report.rows],
+            schema={
+                "split_left": pl.String,
+                "split_right": pl.String,
+                "audit_column": pl.String,
+                "overlapping_id": pl.String,
+            },
+        )
+        leakage_report_path = leakage_report.report_path
+        leakage_report_path.parent.mkdir(parents=True, exist_ok=True)
+        leakage_table.write_parquet(leakage_report_path)
+        raise ManifestPipelineError(
+            f"Leakage detected; wrote report to {leakage_report_path}"
+        )
+
     rows = [
         SplitAssignmentRow.model_validate(row_dict)
         for row_dict in output_table.to_dicts()
@@ -95,5 +118,6 @@ def build_split_assignments(
     return SplitAssignmentArtifact(
         split_contract_id=config.split_contract.split_contract_id,
         output_path=output_path,
+        leakage_report_path=None,
         rows=rows,
     )

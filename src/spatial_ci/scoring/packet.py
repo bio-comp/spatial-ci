@@ -83,6 +83,14 @@ class ScorePacket(BaseModel):
     failure_codes: tuple[ScoreFailureCode, ...] = ()
     metadata: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def validate_packet_state(self) -> "ScorePacket":
+        if self.raw_rank_evidence is None and not self.failure_codes:
+            raise ValueError(
+                "failure_codes must be non-empty when raw_rank_evidence is missing."
+            )
+        return self
+
 
 @runtime_checkable
 class ScorePacketAdapter(Protocol):

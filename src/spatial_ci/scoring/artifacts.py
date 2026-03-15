@@ -82,6 +82,33 @@ class ScorePacket(BaseModel):
 
         if self.status is ScoreStatus.OK and self.failure_code is not None:
             raise ValueError("failure_code must be None when status is ok.")
+        if self.status is ScoreStatus.OK and self.raw_rank_evidence is None:
+            raise ValueError("raw_rank_evidence must be present when status is ok.")
+        if self.status is ScoreStatus.OK and self.dropped_by_missingness_rule:
+            raise ValueError(
+                "dropped_by_missingness_rule must be False when status is ok."
+            )
+        if self.status is not ScoreStatus.OK and self.failure_code is None:
+            raise ValueError("failure_code must be set when status is not ok.")
+        if self.status is ScoreStatus.DROPPED and not self.dropped_by_missingness_rule:
+            raise ValueError(
+                "dropped_by_missingness_rule must be True when status is dropped."
+            )
+        if self.status is ScoreStatus.FAILED and self.dropped_by_missingness_rule:
+            raise ValueError(
+                "dropped_by_missingness_rule must be False when status is failed."
+            )
+        if self.matched_gene_ids is not None:
+            if len(self.matched_gene_ids) != self.signature_size_matched:
+                raise ValueError(
+                    "matched_gene_ids must contain exactly signature_size_matched "
+                    "genes when present."
+                )
+            normalized_gene_ids = tuple(sorted(set(self.matched_gene_ids)))
+            if normalized_gene_ids != self.matched_gene_ids:
+                raise ValueError(
+                    "matched_gene_ids must be sorted and duplicate-free when present."
+                )
 
         return self
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from spatial_ci.manifest.pipeline import build_split_assignments
+from spatial_ci.manifest.pipeline import ManifestPipelineError, build_split_assignments
 
 # build_manifest.py
 # Implements the two-pass manifest builder for Spatial-CI.
@@ -37,10 +37,13 @@ def main(config: Path, output: Path, allow_missing: bool) -> None:
         )
 
     click.secho("Starting Pass 1: Logical Assignments...", fg="cyan")
-    artifact = build_split_assignments(
-        config_path=config,
-        output_path=output,
-    )
+    try:
+        artifact = build_split_assignments(
+            config_path=config,
+            output_path=output,
+        )
+    except ManifestPipelineError as exc:
+        raise click.ClickException(str(exc)) from exc
     click.secho(
         (
             "Split assignments written successfully to: "

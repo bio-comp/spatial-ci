@@ -20,4 +20,23 @@ class SplitAssignmentArtifact(BaseModel):
 
     split_contract_id: str
     output_path: Path
+    leakage_report_path: Path | None = None
     rows: list[SplitAssignmentRow]
+
+
+class LeakageReportRow(BaseModel):
+    """One fatal leakage finding between two audited splits."""
+
+    split_left: str
+    split_right: str
+    audit_column: str
+    overlapping_id: str
+
+
+class LeakageReportArtifact(BaseModel):
+    """Deterministic report of overlap findings across audited splits."""
+
+    split_contract_id: str
+    report_path: Path
+    n_findings: int
+    rows: list[LeakageReportRow]

@@ -26,7 +26,7 @@ def test_assign_patient_splits_is_deterministic() -> None:
     assert first.equals(second)
 
 
-def test_assign_patient_splits_marks_external_cohorts_as_holdout() -> None:
+def test_assign_patient_splits_marks_external_cohorts_as_test_external() -> None:
     frame = pl.DataFrame(
         {
             "sample_id": ["s1"],
@@ -40,4 +40,4 @@ def test_assign_patient_splits_marks_external_cohorts_as_holdout() -> None:
         val_fraction=0.2,
         external_holdout_cohorts=["external-a"],
     )
-    assert assigned.item(0, "split") == "holdout"
+    assert assigned.item(0, "split") == "test_external"
