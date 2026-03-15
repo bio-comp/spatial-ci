@@ -1,6 +1,10 @@
+from pathlib import Path
+
 import polars as pl
 
 from spatial_ci.manifest.leakage import build_leakage_report
+
+REPORT_PATH = Path("assignments.leakage.parquet")
 
 
 def test_build_leakage_report_returns_empty_for_clean_assignments() -> None:
@@ -15,9 +19,14 @@ def test_build_leakage_report_returns_empty_for_clean_assignments() -> None:
             "resolved_slide_id": ["cohort-a::slide1", "cohort-b::slide2"],
         }
     )
-    report = build_leakage_report(frame, split_contract_id="split-v1")
+    report = build_leakage_report(
+        frame,
+        split_contract_id="split-v1",
+        report_path=REPORT_PATH,
+    )
     assert report.n_findings == 0
     assert report.rows == []
+    assert report.report_path == REPORT_PATH
 
 
 def test_build_leakage_report_detects_patient_overlap() -> None:
@@ -32,7 +41,11 @@ def test_build_leakage_report_detects_patient_overlap() -> None:
             "resolved_slide_id": [None, None],
         }
     )
-    report = build_leakage_report(frame, split_contract_id="split-v1")
+    report = build_leakage_report(
+        frame,
+        split_contract_id="split-v1",
+        report_path=REPORT_PATH,
+    )
     assert report.n_findings == 1
     assert report.rows[0].audit_column == "resolved_patient_id"
     assert report.rows[0].overlapping_id == "cohort-a::p1"
@@ -65,7 +78,11 @@ def test_build_leakage_report_detects_specimen_and_slide_overlap() -> None:
             ],
         }
     )
-    report = build_leakage_report(frame, split_contract_id="split-v1")
+    report = build_leakage_report(
+        frame,
+        split_contract_id="split-v1",
+        report_path=REPORT_PATH,
+    )
     findings = [(row.audit_column, row.overlapping_id) for row in report.rows]
     assert ("resolved_specimen_id", "cohort-a::spec1") in findings
     assert ("resolved_slide_id", "cohort-a::slide1") in findings
@@ -83,7 +100,11 @@ def test_build_leakage_report_ignores_null_optional_ids() -> None:
             "resolved_slide_id": [None, None],
         }
     )
-    report = build_leakage_report(frame, split_contract_id="split-v1")
+    report = build_leakage_report(
+        frame,
+        split_contract_id="split-v1",
+        report_path=REPORT_PATH,
+    )
     assert report.n_findings == 0
 
 
@@ -99,7 +120,11 @@ def test_build_leakage_report_respects_namespacing() -> None:
             "resolved_slide_id": [None, None],
         }
     )
-    report = build_leakage_report(frame, split_contract_id="split-v1")
+    report = build_leakage_report(
+        frame,
+        split_contract_id="split-v1",
+        report_path=REPORT_PATH,
+    )
     assert report.n_findings == 0
 
 
@@ -130,7 +155,11 @@ def test_build_leakage_report_sorts_findings_deterministically() -> None:
             ],
         }
     )
-    report = build_leakage_report(frame, split_contract_id="split-v1")
+    report = build_leakage_report(
+        frame,
+        split_contract_id="split-v1",
+        report_path=REPORT_PATH,
+    )
     rows = [
         (row.audit_column, row.split_left, row.split_right, row.overlapping_id)
         for row in report.rows

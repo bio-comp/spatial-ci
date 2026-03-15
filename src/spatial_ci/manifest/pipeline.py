@@ -95,9 +95,6 @@ def build_split_assignments(
         report_path=output_path.with_suffix(".leakage.parquet"),
     )
     if leakage_report.n_findings > 0:
-        leakage_report_path = leakage_report.report_path
-        if leakage_report_path is None:
-            raise ManifestPipelineError("Leakage report path is required for findings")
         leakage_table = pl.DataFrame(
             [row.model_dump() for row in leakage_report.rows],
             schema={
@@ -107,6 +104,7 @@ def build_split_assignments(
                 "overlapping_id": pl.String,
             },
         )
+        leakage_report_path = leakage_report.report_path
         leakage_report_path.parent.mkdir(parents=True, exist_ok=True)
         leakage_table.write_parquet(leakage_report_path)
         raise ManifestPipelineError(

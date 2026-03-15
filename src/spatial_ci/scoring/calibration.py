@@ -59,6 +59,78 @@ class RobustCalibrationResult:
     status: CalibrationStatus
     missing_reference_ids: tuple[str, ...] = ()
 
+    def __post_init__(self) -> None:
+        if self.reference_size < 1:
+            raise ValueError("reference_size must be at least 1.")
+
+        if self.status is CalibrationStatus.OK:
+            required_fields = {
+                "raw_score": self.raw_score,
+                "reference_median": self.reference_median,
+                "reference_mad": self.reference_mad,
+                "scaled_reference_mad": self.scaled_reference_mad,
+                "robust_z_score": self.robust_z_score,
+            }
+            missing_fields = sorted(
+                field_name
+                for field_name, value in required_fields.items()
+                if value is None
+            )
+            if missing_fields:
+                missing_display = ", ".join(missing_fields)
+                raise ValueError(
+                    "status ok requires non-None values for: "
+                    f"{missing_display}."
+                )
+            if self.missing_reference_ids:
+                raise ValueError(
+                    "status ok must not carry missing_reference_ids."
+                )
+
+        if self.status is CalibrationStatus.DEGENERATE_REFERENCE_DISTRIBUTION:
+            required_fields = {
+                "reference_median": self.reference_median,
+                "reference_mad": self.reference_mad,
+                "scaled_reference_mad": self.scaled_reference_mad,
+            }
+            missing_fields = sorted(
+                field_name
+                for field_name, value in required_fields.items()
+                if value is None
+            )
+            if missing_fields:
+                missing_display = ", ".join(missing_fields)
+                raise ValueError(
+                    "degenerate reference results require non-None values for: "
+                    f"{missing_display}."
+                )
+
+        if self.status is CalibrationStatus.REFERENCE_TOO_SMALL:
+            if any(
+                value is not None
+                for value in (
+                    self.reference_median,
+                    self.reference_mad,
+                    self.scaled_reference_mad,
+                    self.robust_z_score,
+                )
+            ):
+                raise ValueError(
+                    "reference_too_small results must not populate calibration "
+                    "summary fields."
+                )
+
+        if self.robust_z_score is not None and self.status is not CalibrationStatus.OK:
+            raise ValueError("robust_z_score is only valid when status is ok.")
+
+        if (
+            self.missing_reference_ids
+            and self.status is not CalibrationStatus.MISSING_DATA
+        ):
+            raise ValueError(
+                "missing_reference_ids are only valid for missing_data results."
+            )
+
 
 def _is_finite_number(value: float) -> bool:
     return math.isfinite(value)

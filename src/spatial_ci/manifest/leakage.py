@@ -34,7 +34,7 @@ def build_leakage_report(
     frame: pl.DataFrame,
     *,
     split_contract_id: str,
-    report_path: Path | None = None,
+    report_path: Path,
 ) -> LeakageReportArtifact:
     """Audit overlap across the required split pairs and identity columns."""
 

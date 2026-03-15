@@ -37,6 +37,6 @@ class LeakageReportArtifact(BaseModel):
     """Deterministic report of overlap findings across audited splits."""
 
     split_contract_id: str
-    report_path: Path | None = None
+    report_path: Path
     n_findings: int
     rows: list[LeakageReportRow]
