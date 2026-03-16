@@ -1,0 +1,2 @@
+sample,patient,specimen,slide,sample_path
+spot-1,patient-1,specimen-1,slide-1,tests/fixtures/manifest/pass2/sample-root/spot-1
