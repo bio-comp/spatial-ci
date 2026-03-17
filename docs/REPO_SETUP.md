@@ -454,6 +454,13 @@ Each should:
 - fail loudly on contract mismatch
 - avoid hidden defaults for scientific choices
 
+Current baseline note:
+
+- `run_baselines.py` currently covers the mean-baseline foundation
+  (`global_train_mean` and `mean_by_train_cohort`)
+- it consumes an explicit score artifact plus manifest parquet
+- embedding baselines and evaluation certificates are follow-up slices
+
 ## 18. Logging policy
 
 Every major run should log:
