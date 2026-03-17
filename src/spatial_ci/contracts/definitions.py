@@ -81,18 +81,24 @@ class ArtifactProvenance(BaseModel):
     artifact_type: str
 
 
+ManifestMetadataValue = str | int | float | bool | None
+
+
 class SampleManifestRow(BaseModel):
     """A single row in the materialized sample manifest."""
 
-    spot_id: str
+    sample_id: str
     cohort_id: str
+    split: str
     resolved_patient_id: str
-    resolved_slide_id: str
-    split_assignment: str  # train, val, holdout
+    patient_id_source: str
+    resolved_specimen_id: str | None = None
+    resolved_slide_id: str | None = None
+    metadata: dict[str, ManifestMetadataValue]
     image_artifact: ArtifactProvenance
     spatial_coords_artifact: ArtifactProvenance
     scalefactors_artifact: ArtifactProvenance
-    expression_artifact: ArtifactProvenance
+    raw_expression_artifact: ArtifactProvenance
     derived_expression_artifact: ArtifactProvenance | None = None
 
 

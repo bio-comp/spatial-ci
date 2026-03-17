@@ -1,0 +1,38 @@
+sources:
+  - path: tests/fixtures/manifest/pass2/metadata_materialize_missing.csv
+    format: csv
+    field_map:
+      sample: sample_id
+      patient: patient_id
+      specimen: specimen_id
+      slide: slide_id
+      sample_path: sample_path
+    cohort_id: cohort-a
+split_contract:
+  split_contract_id: breast_visium_split_v1
+  val_fraction: 0.2
+  external_holdout_cohorts:
+    - external-a
+resolver:
+  sample_roots:
+    - tests/fixtures/manifest/pass2/sample-root
+  sample_path_field: sample_path
+  artifact_candidates:
+    image:
+      - image.tiff
+      - outs/spatial/tissue_hires_image.png
+    spatial_coords:
+      - outs/spatial/tissue_positions.csv
+      - outs/spatial/tissue_positions_list.csv
+    scalefactors:
+      - outs/spatial/scalefactors_json.json
+    raw_expression:
+      - outs/filtered_feature_bc_matrix.h5
+    derived_expression:
+      - derived/expression.h5ad
+manifest:
+  manifest_id: breast_visium_manifest_v1
+  alignment_contract_id: visium_alignment_v1
+  metadata_defaults:
+    assay_platform: visium
+    tissue_type: breast

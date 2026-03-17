@@ -16,40 +16,71 @@ def _load_build_manifest_main() -> Command:
     return module.main
 
 
-def test_build_manifest_cli_writes_split_assignment_artifact(tmp_path: Path) -> None:
-    output_path = tmp_path / "assignments.parquet"
+def test_build_manifest_cli_writes_assignments_and_final_manifest(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "manifest.parquet"
     runner = CliRunner()
     main = _load_build_manifest_main()
     result = runner.invoke(
         main,
         [
             "--config",
-            "tests/fixtures/manifest/pass1/config_basic.yaml",
+            "tests/fixtures/manifest/pass2/config_materialize.yaml",
             "--output",
             str(output_path),
         ],
     )
+
+    assignments_path = output_path.with_suffix(".assignments.parquet")
     assert result.exit_code == 0
+    assert assignments_path.exists()
     assert output_path.exists()
     assert pl.read_parquet(output_path).height > 0
 
 
-def test_build_manifest_cli_fails_with_leakage_report(tmp_path: Path) -> None:
-    output_path = tmp_path / "assignments.parquet"
+def test_build_manifest_cli_writes_rejections_and_fails_by_default(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "manifest.parquet"
     runner = CliRunner()
     main = _load_build_manifest_main()
     result = runner.invoke(
         main,
         [
             "--config",
-            "tests/fixtures/manifest/pass1/config_leakage.yaml",
+            "tests/fixtures/manifest/pass2/config_materialize_missing.yaml",
             "--output",
             str(output_path),
         ],
     )
 
-    leakage_path = output_path.with_suffix(".leakage.parquet")
+    assignments_path = output_path.with_suffix(".assignments.parquet")
+    rejections_path = output_path.with_suffix(".rejections.parquet")
     assert result.exit_code != 0
-    assert "Leakage detected" in result.output
+    assert "rejection ledger" in result.output
+    assert assignments_path.exists()
+    assert rejections_path.exists()
+    assert not output_path.exists()
+
+
+def test_build_manifest_cli_allows_missing_with_warning(tmp_path: Path) -> None:
+    output_path = tmp_path / "manifest.parquet"
+    runner = CliRunner()
+    main = _load_build_manifest_main()
+    result = runner.invoke(
+        main,
+        [
+            "--config",
+            "tests/fixtures/manifest/pass2/config_materialize_missing.yaml",
+            "--output",
+            str(output_path),
+            "--allow-missing",
+        ],
+    )
+
+    rejections_path = output_path.with_suffix(".rejections.parquet")
+    assert result.exit_code == 0
+    assert "warning" in result.output.lower()
     assert output_path.exists()
-    assert leakage_path.exists()
+    assert rejections_path.exists()

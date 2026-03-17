@@ -38,4 +38,9 @@ def normalize_manifest_source(
         for column_name in PASS1_CANONICAL_COLUMNS
         if column_name in normalized.columns
     ]
-    return normalized.select(ordered_columns)
+    extra_columns = [
+        column_name
+        for column_name in normalized.columns
+        if column_name not in ordered_columns
+    ]
+    return normalized.select([*ordered_columns, *extra_columns])

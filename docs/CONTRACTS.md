@@ -516,6 +516,12 @@ Responsibilities:
 - rejection ledger output
 - deterministic final manifest serialization
 
+Recommended sibling outputs for `manifest.parquet`:
+- `manifest.assignments.parquet`
+- `manifest.assignments.leakage.parquet` on pass-1 leakage
+- `manifest.rejections.parquet` on pass-2 rejection
+- `manifest.parquet` for accepted final rows
+
 ## Determinism rule
 Sort the flattened staging table before serialization, e.g.:
 - `split`

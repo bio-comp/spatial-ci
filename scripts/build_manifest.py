@@ -5,7 +5,10 @@ from pathlib import Path
 
 import click
 
-from spatial_ci.manifest.pipeline import ManifestPipelineError, build_split_assignments
+from spatial_ci.manifest.pipeline import (
+    ManifestPipelineError,
+    build_materialized_manifest,
+)
 
 # build_manifest.py
 # Implements the two-pass manifest builder for Spatial-CI.
@@ -31,24 +34,25 @@ from spatial_ci.manifest.pipeline import ManifestPipelineError, build_split_assi
 def main(config: Path, output: Path, allow_missing: bool) -> None:
     """Spatial-CI Two-Pass Manifest Builder."""
 
-    if allow_missing:
-        raise click.ClickException(
-            "--allow-missing is not implemented in the pass-1 split-foundation slice."
-        )
-
-    click.secho("Starting Pass 1: Logical Assignments...", fg="cyan")
+    click.secho("Starting manifest build...", fg="cyan")
     try:
-        artifact = build_split_assignments(
+        artifact = build_materialized_manifest(
             config_path=config,
             output_path=output,
+            allow_missing=allow_missing,
         )
     except ManifestPipelineError as exc:
         raise click.ClickException(str(exc)) from exc
+    if artifact.rejection_ledger_path is not None:
+        click.secho(
+            (
+                "Warning: wrote rejection ledger to "
+                f"{artifact.rejection_ledger_path}"
+            ),
+            fg="yellow",
+        )
     click.secho(
-        (
-            "Split assignments written successfully to: "
-            f"{artifact.output_path}"
-        ),
+        f"Final manifest written successfully to: {artifact.output_path}",
         fg="green",
     )
 
