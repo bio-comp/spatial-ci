@@ -3,6 +3,7 @@ from pathlib import Path
 import polars as pl
 
 from spatial_ci.manifest.artifacts import (
+    MaterializedManifestArtifact,
     SplitAssignmentArtifact,
     SplitAssignmentRow,
 )
@@ -13,6 +14,10 @@ from spatial_ci.manifest.config import (
 )
 from spatial_ci.manifest.identity import derive_resolved_identity
 from spatial_ci.manifest.leakage import build_leakage_report
+from spatial_ci.manifest.materialize import (
+    ManifestMaterializationError,
+    materialize_manifest,
+)
 from spatial_ci.manifest.normalize import normalize_manifest_source
 from spatial_ci.manifest.splits import assign_patient_splits
 
@@ -28,7 +33,7 @@ OUTPUT_COLUMNS = [
 
 
 class ManifestPipelineError(RuntimeError):
-    """Raised when pass-1 manifest construction fails."""
+    """Raised when manifest construction or materialization fails."""
 
 
 def _read_source_table(source: ManifestSourceConfig) -> pl.DataFrame:
@@ -64,25 +69,25 @@ def _validate_unique_sample_ids(frame: pl.DataFrame) -> None:
     raise ManifestPipelineError(f"duplicate sample_id: {duplicate_display}")
 
 
-def build_split_assignments(
-    *,
-    config_path: Path,
-    output_path: Path,
-) -> SplitAssignmentArtifact:
-    """Build the pass-1 split-assignment artifact and write it to Parquet."""
-
-    config = load_manifest_config(config_path)
+def _prepare_assignment_frame(config: ManifestBuildConfig) -> pl.DataFrame:
     normalized = _normalize_sources(config)
     _validate_unique_sample_ids(normalized)
 
     resolved = derive_resolved_identity(normalized)
-    assigned = assign_patient_splits(
+    return assign_patient_splits(
         resolved,
         split_contract_id=config.split_contract.split_contract_id,
         val_fraction=config.split_contract.val_fraction,
         external_holdout_cohorts=config.split_contract.external_holdout_cohorts,
     )
 
+
+def _write_split_assignments(
+    assigned: pl.DataFrame,
+    *,
+    split_contract_id: str,
+    output_path: Path,
+) -> SplitAssignmentArtifact:
     output_table = assigned.select(OUTPUT_COLUMNS).sort(
         by=["split", "cohort_id", "sample_id"]
     )
@@ -91,7 +96,7 @@ def build_split_assignments(
 
     leakage_report = build_leakage_report(
         output_table,
-        split_contract_id=config.split_contract.split_contract_id,
+        split_contract_id=split_contract_id,
         report_path=output_path.with_suffix(".leakage.parquet"),
     )
     if leakage_report.n_findings > 0:
@@ -116,8 +121,58 @@ def build_split_assignments(
         for row_dict in output_table.to_dicts()
     ]
     return SplitAssignmentArtifact(
-        split_contract_id=config.split_contract.split_contract_id,
+        split_contract_id=split_contract_id,
         output_path=output_path,
         leakage_report_path=None,
         rows=rows,
     )
+
+
+def build_split_assignments(
+    *,
+    config_path: Path,
+    output_path: Path,
+) -> SplitAssignmentArtifact:
+    """Build the pass-1 split-assignment artifact and write it to Parquet."""
+
+    config = load_manifest_config(config_path)
+    assigned = _prepare_assignment_frame(config)
+    return _write_split_assignments(
+        assigned,
+        split_contract_id=config.split_contract.split_contract_id,
+        output_path=output_path,
+    )
+
+
+def build_materialized_manifest(
+    *,
+    config_path: Path,
+    output_path: Path,
+    allow_missing: bool,
+) -> MaterializedManifestArtifact:
+    """Run pass 1 and pass 2, writing assignments and final manifest outputs."""
+
+    config = load_manifest_config(config_path)
+    if config.resolver is None or config.manifest is None:
+        raise ManifestPipelineError(
+            "Pass-2 materialization requires resolver and manifest config sections"
+        )
+
+    assigned = _prepare_assignment_frame(config)
+    assignments_path = output_path.with_suffix(".assignments.parquet")
+    _write_split_assignments(
+        assigned,
+        split_contract_id=config.split_contract.split_contract_id,
+        output_path=assignments_path,
+    )
+    try:
+        return materialize_manifest(
+            assigned,
+            output_path=output_path,
+            split_contract_id=config.split_contract.split_contract_id,
+            resolver_config=config.resolver,
+            manifest_config=config.manifest,
+            allow_missing=allow_missing,
+        )
+    except ManifestMaterializationError as exc:
+        raise ManifestPipelineError(str(exc)) from exc
