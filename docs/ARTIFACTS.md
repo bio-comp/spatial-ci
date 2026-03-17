@@ -385,10 +385,12 @@ Stores the raw predictions emitted by a run.
 ## Minimum contents
 
 - `run_id`
+- `observation_id`
 - `sample_id`
-- `spot_id`
 - `program_name`
 - predicted score
+- for baseline outputs: `baseline_name`
+- recommended context: `cohort_id`, `split`
 - optional auxiliary outputs such as uncertainty or latent features
 
 ## Why it exists
