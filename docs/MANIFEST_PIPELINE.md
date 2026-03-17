@@ -466,7 +466,7 @@ If a sample fails:
 then it must be written to a rejection ledger.
 
 Recommended output:
-- `rejections.ndjson`
+- `manifest.rejections.parquet`
 
 Include at minimum:
 - `sample_id`
@@ -493,6 +493,13 @@ The final manifest should be:
 - validated
 - sorted
 - deterministic
+
+For an output path like `manifest.parquet`, sibling artifacts should be:
+
+- `manifest.assignments.parquet`
+- `manifest.assignments.leakage.parquet` when pass-1 leakage is found
+- `manifest.rejections.parquet` when pass-2 rejections occur
+- `manifest.parquet` for accepted final rows
 - auditable
 
 Recommended output:
