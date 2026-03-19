@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, model_validator
 
 
 class EmbeddingArtifactRow(BaseModel):
@@ -15,7 +15,7 @@ class EmbeddingArtifactRow(BaseModel):
 
     observation_id: str = Field(min_length=1)
     sample_id: str = Field(min_length=1)
-    embedding: tuple[float, ...] = Field(min_length=1)
+    embedding: tuple[FiniteFloat, ...] = Field(min_length=1)
 
 
 class EmbeddingArtifact(BaseModel):
@@ -26,8 +26,8 @@ class EmbeddingArtifact(BaseModel):
     alignment_contract_id: str = Field(min_length=1)
     encoder_name: str = Field(min_length=1)
     encoder_version: str = Field(min_length=1)
-    source_embedding_artifact_path: str | None = None
-    source_embedding_artifact_hash: str | None = None
+    source_image_artifact_path: str | None = None
+    source_image_artifact_hash: str | None = None
     n_rows: int = Field(ge=0)
     rows: tuple[EmbeddingArtifactRow, ...]
 
@@ -50,8 +50,9 @@ class EmbeddingArtifact(BaseModel):
 def write_embedding_artifact(artifact: EmbeddingArtifact, path: Path) -> None:
     """Write an embedding artifact to Parquet with schema metadata."""
 
+    sorted_rows = sorted(artifact.rows, key=lambda row: row.observation_id)
     row_table = pa.Table.from_pylist(
-        [row.model_dump(mode="json") for row in artifact.rows]
+        [row.model_dump(mode="json") for row in sorted_rows]
     )
     artifact_metadata = artifact.model_dump(mode="json")
     artifact_metadata.pop("rows")

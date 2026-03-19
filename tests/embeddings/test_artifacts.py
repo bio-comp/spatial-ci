@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 from pydantic import ValidationError
 
@@ -16,8 +18,8 @@ def test_embedding_artifact_roundtrips_through_parquet(tmp_path: Path) -> None:
         alignment_contract_id="alignment-v1",
         encoder_name="clip-vit-b32",
         encoder_version="1.0.0",
-        source_embedding_artifact_path="embeddings/source.parquet",
-        source_embedding_artifact_hash="a" * 64,
+        source_image_artifact_path="images/source.tiff",
+        source_image_artifact_hash="a" * 64,
         n_rows=2,
         rows=(
             EmbeddingArtifactRow(
@@ -40,6 +42,40 @@ def test_embedding_artifact_roundtrips_through_parquet(tmp_path: Path) -> None:
     assert observed == artifact
 
 
+def test_embedding_artifact_writes_rows_in_observation_order(
+    tmp_path: Path,
+) -> None:
+    artifact = EmbeddingArtifact(
+        alignment_contract_id="alignment-v1",
+        encoder_name="clip-vit-b32",
+        encoder_version="1.0.0",
+        source_image_artifact_path=None,
+        source_image_artifact_hash=None,
+        n_rows=2,
+        rows=(
+            EmbeddingArtifactRow(
+                observation_id="obs-2",
+                sample_id="sample-2",
+                embedding=(0.4, 0.5, 0.6),
+            ),
+            EmbeddingArtifactRow(
+                observation_id="obs-1",
+                sample_id="sample-1",
+                embedding=(0.1, 0.2, 0.3),
+            ),
+        ),
+    )
+    path = tmp_path / "embeddings.parquet"
+
+    write_embedding_artifact(artifact, path)
+    table = pq.read_table(path)
+
+    assert [row["observation_id"] for row in table.to_pylist()] == [
+        "obs-1",
+        "obs-2",
+    ]
+
+
 def test_embedding_artifact_rejects_duplicate_observation_ids() -> None:
     row = EmbeddingArtifactRow(
         observation_id="obs-1",
@@ -52,8 +88,8 @@ def test_embedding_artifact_rejects_duplicate_observation_ids() -> None:
             alignment_contract_id="alignment-v1",
             encoder_name="clip-vit-b32",
             encoder_version="1.0.0",
-            source_embedding_artifact_path=None,
-            source_embedding_artifact_hash=None,
+            source_image_artifact_path=None,
+            source_image_artifact_hash=None,
             n_rows=2,
             rows=(row, row),
         )
@@ -65,8 +101,8 @@ def test_embedding_artifact_rejects_inconsistent_embedding_dimensions() -> None:
             alignment_contract_id="alignment-v1",
             encoder_name="clip-vit-b32",
             encoder_version="1.0.0",
-            source_embedding_artifact_path=None,
-            source_embedding_artifact_hash=None,
+            source_image_artifact_path=None,
+            source_image_artifact_hash=None,
             n_rows=2,
             rows=(
                 EmbeddingArtifactRow(
@@ -83,6 +119,22 @@ def test_embedding_artifact_rejects_inconsistent_embedding_dimensions() -> None:
         )
 
 
+def test_embedding_artifact_rejects_non_finite_embedding_values() -> None:
+    with pytest.raises(ValidationError):
+        EmbeddingArtifactRow(
+            observation_id="obs-1",
+            sample_id="sample-1",
+            embedding=(float("nan"),),
+        )
+
+    with pytest.raises(ValidationError):
+        EmbeddingArtifactRow(
+            observation_id="obs-1",
+            sample_id="sample-1",
+            embedding=(float("inf"),),
+        )
+
+
 def test_embedding_artifact_requires_row_sample_id_and_metadata_fields() -> None:
     with pytest.raises(ValidationError, match="sample_id"):
         EmbeddingArtifactRow.model_validate(
@@ -94,9 +146,19 @@ def test_embedding_artifact_requires_row_sample_id_and_metadata_fields() -> None
             {
                 "alignment_contract_id": "alignment-v1",
                 "encoder_version": "1.0.0",
-                "source_embedding_artifact_path": None,
-                "source_embedding_artifact_hash": None,
+                "source_image_artifact_path": None,
+                "source_image_artifact_hash": None,
                 "n_rows": 0,
                 "rows": (),
             }
         )
+
+
+def test_embedding_artifact_read_rejects_missing_schema_metadata(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "embeddings.parquet"
+    pq.write_table(pa.table({"observation_id": ["obs-1"]}), path)
+
+    with pytest.raises(ValueError, match="spatial_ci_embedding_artifact"):
+        read_embedding_artifact(path)
