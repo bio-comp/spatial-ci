@@ -8,6 +8,11 @@ from spatial_ci.baselines.artifacts import (
     read_baseline_prediction_artifact,
 )
 from spatial_ci.baselines.runner import run_mean_baselines
+from spatial_ci.embeddings.artifacts import (
+    EmbeddingArtifact,
+    EmbeddingArtifactRow,
+    write_embedding_artifact,
+)
 from spatial_ci.scoring.artifacts import (
     ScoreArtifact,
     ScorePacket,
@@ -113,6 +118,56 @@ def _write_manifest(path: Path, *, duplicate_sample_id: bool = False) -> None:
     pl.DataFrame(rows).write_parquet(path)
 
 
+def _write_embedding_artifact(
+    path: Path,
+    *,
+    include_obs4: bool = True,
+    duplicate_observation_id: bool = False,
+    inconsistent_dimensions: bool = False,
+) -> None:
+    rows = [
+        EmbeddingArtifactRow.model_construct(
+            observation_id="obs-1",
+            sample_id="s1",
+            embedding=(0.1, 0.2),
+        ),
+        EmbeddingArtifactRow.model_construct(
+            observation_id="obs-2",
+            sample_id="s2",
+            embedding=(0.3, 0.4, 0.5) if inconsistent_dimensions else (0.3, 0.4),
+        ),
+        EmbeddingArtifactRow.model_construct(
+            observation_id="obs-3",
+            sample_id="s3",
+            embedding=(0.5, 0.6),
+        ),
+    ]
+    if include_obs4:
+        rows.append(
+            EmbeddingArtifactRow.model_construct(
+                observation_id="obs-4",
+                sample_id="s3",
+                embedding=(0.7, 0.8),
+            )
+        )
+    if duplicate_observation_id:
+        rows[-1] = EmbeddingArtifactRow.model_construct(
+            observation_id="obs-3",
+            sample_id="s3",
+            embedding=(0.7, 0.8),
+        )
+    artifact = EmbeddingArtifact.model_construct(
+        alignment_contract_id="alignment-v1",
+        encoder_name="encoder-x",
+        encoder_version="1.0.0",
+        source_image_artifact_path="images.parquet",
+        source_image_artifact_hash="d" * 64,
+        n_rows=len(rows),
+        rows=tuple(rows),
+    )
+    write_embedding_artifact(artifact, path)
+
+
 def test_run_mean_baselines_writes_long_form_predictions(tmp_path: Path) -> None:
     score_path = tmp_path / "scores.parquet"
     manifest_path = tmp_path / "manifest.parquet"
@@ -133,6 +188,142 @@ def test_run_mean_baselines_writes_long_form_predictions(tmp_path: Path) -> None
     observed = read_baseline_prediction_artifact(output_path)
     assert output_path.exists()
     assert artifact == observed
+    assert artifact.n_rows == 8
+    assert {row.baseline_name for row in artifact.rows} == {
+        BaselineName.GLOBAL_TRAIN_MEAN,
+        BaselineName.MEAN_BY_TRAIN_COHORT,
+    }
+
+
+def test_run_mean_baselines_writes_mean_and_knn_predictions_with_embeddings(
+    tmp_path: Path,
+) -> None:
+    score_path = tmp_path / "scores.parquet"
+    manifest_path = tmp_path / "manifest.parquet"
+    embedding_path = tmp_path / "embeddings.parquet"
+    output_path = tmp_path / "baseline_predictions.parquet"
+    write_score_artifact(_score_artifact(), score_path)
+    _write_manifest(manifest_path)
+    _write_embedding_artifact(embedding_path)
+
+    artifact = run_mean_baselines(
+        score_artifact_path=score_path,
+        manifest_path=manifest_path,
+        output_path=output_path,
+        run_id="baseline-run-1",
+        baseline_contract_id="mean_baselines_v0",
+        split_contract_id="breast_visium_split_v1",
+        manifest_id="manifest-v1",
+        embedding_artifact_path=embedding_path,
+    )
+
+    assert output_path.exists()
+    assert artifact.n_rows == 12
+    assert {row.baseline_name for row in artifact.rows} == {
+        BaselineName.GLOBAL_TRAIN_MEAN,
+        BaselineName.MEAN_BY_TRAIN_COHORT,
+        BaselineName.KNN_ON_EMBEDDINGS,
+    }
+    assert len(
+        [
+            row
+            for row in artifact.rows
+            if row.baseline_name is BaselineName.KNN_ON_EMBEDDINGS
+        ]
+    ) == 4
+
+
+def test_run_mean_baselines_rejects_missing_embedding_for_eligible_score_row(
+    tmp_path: Path,
+) -> None:
+    score_path = tmp_path / "scores.parquet"
+    manifest_path = tmp_path / "manifest.parquet"
+    embedding_path = tmp_path / "embeddings.parquet"
+    output_path = tmp_path / "baseline_predictions.parquet"
+    write_score_artifact(_score_artifact(), score_path)
+    _write_manifest(manifest_path)
+    _write_embedding_artifact(embedding_path, include_obs4=False)
+
+    with pytest.raises(ValueError, match="embedding"):
+        run_mean_baselines(
+            score_artifact_path=score_path,
+            manifest_path=manifest_path,
+            output_path=output_path,
+            run_id="baseline-run-1",
+            baseline_contract_id="mean_baselines_v0",
+            split_contract_id="breast_visium_split_v1",
+            manifest_id="manifest-v1",
+            embedding_artifact_path=embedding_path,
+        )
+
+
+def test_run_mean_baselines_rejects_duplicate_embedding_observation_id(
+    tmp_path: Path,
+) -> None:
+    score_path = tmp_path / "scores.parquet"
+    manifest_path = tmp_path / "manifest.parquet"
+    embedding_path = tmp_path / "embeddings.parquet"
+    output_path = tmp_path / "baseline_predictions.parquet"
+    write_score_artifact(_score_artifact(), score_path)
+    _write_manifest(manifest_path)
+    _write_embedding_artifact(embedding_path, duplicate_observation_id=True)
+
+    with pytest.raises(ValueError, match="observation_id"):
+        run_mean_baselines(
+            score_artifact_path=score_path,
+            manifest_path=manifest_path,
+            output_path=output_path,
+            run_id="baseline-run-1",
+            baseline_contract_id="mean_baselines_v0",
+            split_contract_id="breast_visium_split_v1",
+            manifest_id="manifest-v1",
+            embedding_artifact_path=embedding_path,
+        )
+
+
+def test_run_mean_baselines_rejects_inconsistent_embedding_dimensionality(
+    tmp_path: Path,
+) -> None:
+    score_path = tmp_path / "scores.parquet"
+    manifest_path = tmp_path / "manifest.parquet"
+    embedding_path = tmp_path / "embeddings.parquet"
+    output_path = tmp_path / "baseline_predictions.parquet"
+    write_score_artifact(_score_artifact(), score_path)
+    _write_manifest(manifest_path)
+    _write_embedding_artifact(embedding_path, inconsistent_dimensions=True)
+
+    with pytest.raises(ValueError, match="consistent dimensionality"):
+        run_mean_baselines(
+            score_artifact_path=score_path,
+            manifest_path=manifest_path,
+            output_path=output_path,
+            run_id="baseline-run-1",
+            baseline_contract_id="mean_baselines_v0",
+            split_contract_id="breast_visium_split_v1",
+            manifest_id="manifest-v1",
+            embedding_artifact_path=embedding_path,
+        )
+
+
+def test_run_mean_baselines_without_embeddings_preserves_mean_only_behavior(
+    tmp_path: Path,
+) -> None:
+    score_path = tmp_path / "scores.parquet"
+    manifest_path = tmp_path / "manifest.parquet"
+    output_path = tmp_path / "baseline_predictions.parquet"
+    write_score_artifact(_score_artifact(), score_path)
+    _write_manifest(manifest_path)
+
+    artifact = run_mean_baselines(
+        score_artifact_path=score_path,
+        manifest_path=manifest_path,
+        output_path=output_path,
+        run_id="baseline-run-1",
+        baseline_contract_id="mean_baselines_v0",
+        split_contract_id="breast_visium_split_v1",
+        manifest_id="manifest-v1",
+    )
+
     assert artifact.n_rows == 8
     assert {row.baseline_name for row in artifact.rows} == {
         BaselineName.GLOBAL_TRAIN_MEAN,
