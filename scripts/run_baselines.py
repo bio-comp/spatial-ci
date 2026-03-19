@@ -36,6 +36,12 @@ from spatial_ci.baselines.runner import run_mean_baselines
     required=False,
     help="Optional manifest identifier for artifact provenance",
 )
+@click.option(
+    "--embeddings",
+    type=Path,
+    required=False,
+    help="Optional path to embedding artifact",
+)
 def main(
     scores: Path,
     manifest: Path,
@@ -44,6 +50,7 @@ def main(
     baseline_contract_id: str,
     split_contract_id: str,
     manifest_id: str | None,
+    embeddings: Path | None,
 ) -> None:
     """Run the mean-baseline foundation against frozen score and manifest inputs."""
 
@@ -55,6 +62,7 @@ def main(
         baseline_contract_id=baseline_contract_id,
         split_contract_id=split_contract_id,
         manifest_id=manifest_id,
+        embedding_artifact_path=embeddings,
     )
     click.secho(
         (
