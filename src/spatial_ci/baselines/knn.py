@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from math import isfinite
+from typing import TypedDict, cast
 
 import numpy as np
 import polars as pl
@@ -19,6 +20,16 @@ REQUIRED_COLUMNS = {
     "raw_rank_evidence",
     "embedding",
 }
+
+
+class _KnnRow(TypedDict):
+    observation_id: str
+    sample_id: str
+    cohort_id: str
+    split: str
+    program_name: str
+    raw_rank_evidence: float
+    embedding: Sequence[float]
 
 
 def _validate_required_columns(frame: pl.DataFrame) -> None:
@@ -41,17 +52,19 @@ def _cosine_distance(left: Sequence[float], right: Sequence[float]) -> float:
     return 1.0 - similarity
 
 
-def _candidate_rows_for_program(frame: pl.DataFrame, program_name: str) -> list[dict]:
+def _candidate_rows_for_program(
+    frame: pl.DataFrame, program_name: str
+) -> list[_KnnRow]:
     program_rows = frame.filter(pl.col("program_name") == program_name)
     train_rows = program_rows.filter(pl.col("split") == "train")
     if train_rows.height == 0:
         raise ValueError(f"program {program_name} has no train rows")
-    return train_rows.to_dicts()
+    return cast("list[_KnnRow]", train_rows.to_dicts())
 
 
 def _predict_row(
-    row: dict,
-    candidates: list[dict],
+    row: _KnnRow,
+    candidates: list[_KnnRow],
     *,
     k: int,
 ) -> float:
@@ -100,8 +113,8 @@ def predict_knn_on_embeddings(frame: pl.DataFrame, *, k: int = 20) -> pl.DataFra
         for program_name in program_names
     }
 
-    predictions = []
-    for row in frame.to_dicts():
+    predictions: list[dict[str, object]] = []
+    for row in cast("list[_KnnRow]", frame.to_dicts()):
         program_name = row["program_name"]
         predicted_score = _predict_row(
             row,
