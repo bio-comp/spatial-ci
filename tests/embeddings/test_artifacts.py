@@ -85,17 +85,18 @@ def test_embedding_artifact_rejects_inconsistent_embedding_dimensions() -> None:
 
 def test_embedding_artifact_requires_row_sample_id_and_metadata_fields() -> None:
     with pytest.raises(ValidationError, match="sample_id"):
-        EmbeddingArtifactRow(
-            observation_id="obs-1",
-            embedding=(0.1, 0.2, 0.3),
+        EmbeddingArtifactRow.model_validate(
+            {"observation_id": "obs-1", "embedding": (0.1, 0.2, 0.3)}
         )
 
     with pytest.raises(ValidationError, match="encoder_name"):
-        EmbeddingArtifact(
-            alignment_contract_id="alignment-v1",
-            encoder_version="1.0.0",
-            source_embedding_artifact_path=None,
-            source_embedding_artifact_hash=None,
-            n_rows=0,
-            rows=(),
+        EmbeddingArtifact.model_validate(
+            {
+                "alignment_contract_id": "alignment-v1",
+                "encoder_version": "1.0.0",
+                "source_embedding_artifact_path": None,
+                "source_embedding_artifact_hash": None,
+                "n_rows": 0,
+                "rows": (),
+            }
         )
