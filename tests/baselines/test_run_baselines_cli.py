@@ -5,8 +5,10 @@ import polars as pl
 from click import Command
 from click.testing import CliRunner
 
-from spatial_ci.baselines.artifacts import read_baseline_prediction_artifact
-from spatial_ci.baselines.artifacts import BaselineName
+from spatial_ci.baselines.artifacts import (
+    BaselineName,
+    read_baseline_prediction_artifact,
+)
 from spatial_ci.embeddings.artifacts import (
     EmbeddingArtifact,
     EmbeddingArtifactRow,
