@@ -1,4 +1,4 @@
-"""Baseline runner orchestration for mean-based deployable baselines."""
+"""Baseline runner orchestration for mean-based and embedding-aware baselines."""
 
 import hashlib
 from pathlib import Path
@@ -10,10 +10,12 @@ from spatial_ci.baselines.artifacts import (
     BaselinePredictionRow,
     write_baseline_prediction_artifact,
 )
+from spatial_ci.baselines.knn import predict_knn_on_embeddings
 from spatial_ci.baselines.mean import (
     predict_global_train_mean,
     predict_mean_by_train_cohort,
 )
+from spatial_ci.embeddings.artifacts import read_embedding_artifact
 from spatial_ci.scoring.artifacts import read_score_artifact
 
 MANIFEST_REQUIRED_COLUMNS = {"sample_id", "cohort_id", "split"}
@@ -90,6 +92,45 @@ def _joined_baseline_frame(
     return score_frame.join(manifest_frame, on="sample_id", how="left", validate="m:1")
 
 
+def _embedding_frame(path: Path) -> pl.DataFrame:
+    artifact = read_embedding_artifact(path)
+    return pl.DataFrame(
+        [
+            {
+                "observation_id": row.observation_id,
+                "embedding": list(row.embedding),
+            }
+            for row in artifact.rows
+        ]
+    )
+
+
+def _joined_embedding_frame(
+    score_frame: pl.DataFrame,
+    embedding_frame: pl.DataFrame,
+) -> pl.DataFrame:
+    joined = score_frame.join(
+        embedding_frame,
+        on="observation_id",
+        how="left",
+        validate="m:1",
+    )
+    missing_observation_ids = (
+        joined.filter(pl.col("embedding").is_null())
+        .get_column("observation_id")
+        .to_list()
+    )
+    if missing_observation_ids:
+        missing_display = ", ".join(
+            sorted(str(value) for value in missing_observation_ids)
+        )
+        raise ValueError(
+            "eligible score rows are missing embeddings for observation_id values: "
+            f"{missing_display}"
+        )
+    return joined
+
+
 def _prediction_rows(frame: pl.DataFrame) -> tuple[BaselinePredictionRow, ...]:
     ordered = frame.sort(
         by=[
@@ -116,6 +157,7 @@ def run_mean_baselines(
     baseline_contract_id: str,
     split_contract_id: str,
     manifest_id: str | None,
+    embedding_artifact_path: Path | None = None,
 ) -> BaselinePredictionArtifact:
     """Run the mean-based deployable baselines and write the prediction artifact."""
 
@@ -123,13 +165,17 @@ def run_mean_baselines(
         _score_frame(score_artifact_path)
     )
     joined = _joined_baseline_frame(score_frame, _manifest_frame(manifest_path))
-    prediction_frame = pl.concat(
-        [
-            predict_global_train_mean(joined),
-            predict_mean_by_train_cohort(joined),
-        ],
-        how="vertical",
-    )
+    prediction_frames = [
+        predict_global_train_mean(joined),
+        predict_mean_by_train_cohort(joined),
+    ]
+    if embedding_artifact_path is not None:
+        joined_with_embeddings = _joined_embedding_frame(
+            joined,
+            _embedding_frame(embedding_artifact_path),
+        )
+        prediction_frames.append(predict_knn_on_embeddings(joined_with_embeddings))
+    prediction_frame = pl.concat(prediction_frames, how="vertical")
     rows = _prediction_rows(prediction_frame)
     artifact = BaselinePredictionArtifact(
         run_id=run_id,

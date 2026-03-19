@@ -459,6 +459,10 @@ Current baseline note:
 - `run_baselines.py` currently covers the mean-baseline foundation
   (`global_train_mean` and `mean_by_train_cohort`)
 - it consumes an explicit score artifact plus manifest parquet
+- `--embeddings <path>` enables the frozen `knn_on_embeddings` baseline on the
+  same joined score rows; omit it to run mean baselines only
+- the embeddings artifact must carry `observation_id`, `sample_id`, and
+  finite embedding vectors at a single consistent dimensionality
 - embedding baselines and evaluation certificates are follow-up slices
 
 ## 18. Logging policy
