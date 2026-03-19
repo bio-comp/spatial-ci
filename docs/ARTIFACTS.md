@@ -340,6 +340,12 @@ Stores precomputed image features for downstream baselines and simple learned mo
 - feature dimensionality
 - embedding storage path/hash
 
+The on-disk embedding table should also expose a stable observation grain:
+
+- `observation_id`
+- `sample_id`
+- `embedding` as a non-empty finite vector with one consistent dimensionality across rows
+
 ## Why it exists
 
 Embeddings should be reproducible and explicitly tied to:
