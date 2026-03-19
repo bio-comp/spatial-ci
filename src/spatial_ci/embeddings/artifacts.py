@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, model_validator
 class EmbeddingArtifactRow(BaseModel):
     """One embedding row at observation grain."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     observation_id: str = Field(min_length=1)
     sample_id: str = Field(min_length=1)
@@ -21,7 +21,7 @@ class EmbeddingArtifactRow(BaseModel):
 class EmbeddingArtifact(BaseModel):
     """Artifact-level embedding provenance and rows."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     alignment_contract_id: str = Field(min_length=1)
     encoder_name: str = Field(min_length=1)
@@ -43,6 +43,9 @@ class EmbeddingArtifact(BaseModel):
         embedding_dimensions = {len(row.embedding) for row in self.rows}
         if len(embedding_dimensions) > 1:
             raise ValueError("embedding must have consistent dimensionality")
+
+        sorted_rows = tuple(sorted(self.rows, key=lambda row: row.observation_id))
+        object.__setattr__(self, "rows", sorted_rows)
 
         return self
 

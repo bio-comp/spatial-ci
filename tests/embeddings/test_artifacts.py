@@ -42,6 +42,31 @@ def test_embedding_artifact_roundtrips_through_parquet(tmp_path: Path) -> None:
     assert observed == artifact
 
 
+def test_embedding_artifact_canonicalizes_rows_by_observation_id() -> None:
+    artifact = EmbeddingArtifact(
+        alignment_contract_id="alignment-v1",
+        encoder_name="clip-vit-b32",
+        encoder_version="1.0.0",
+        source_image_artifact_path=None,
+        source_image_artifact_hash=None,
+        n_rows=2,
+        rows=(
+            EmbeddingArtifactRow(
+                observation_id="obs-2",
+                sample_id="sample-2",
+                embedding=(0.4, 0.5, 0.6),
+            ),
+            EmbeddingArtifactRow(
+                observation_id="obs-1",
+                sample_id="sample-1",
+                embedding=(0.1, 0.2, 0.3),
+            ),
+        ),
+    )
+
+    assert tuple(row.observation_id for row in artifact.rows) == ("obs-1", "obs-2")
+
+
 def test_embedding_artifact_writes_rows_in_observation_order(
     tmp_path: Path,
 ) -> None:
@@ -150,6 +175,32 @@ def test_embedding_artifact_requires_row_sample_id_and_metadata_fields() -> None
                 "source_image_artifact_hash": None,
                 "n_rows": 0,
                 "rows": (),
+            }
+        )
+
+
+def test_embedding_artifact_rejects_unexpected_row_and_metadata_keys() -> None:
+    with pytest.raises(ValidationError, match="extra"):
+        EmbeddingArtifactRow.model_validate(
+            {
+                "observation_id": "obs-1",
+                "sample_id": "sample-1",
+                "embedding": (0.1, 0.2, 0.3),
+                "unexpected": "value",
+            }
+        )
+
+    with pytest.raises(ValidationError, match="extra"):
+        EmbeddingArtifact.model_validate(
+            {
+                "alignment_contract_id": "alignment-v1",
+                "encoder_name": "clip-vit-b32",
+                "encoder_version": "1.0.0",
+                "source_image_artifact_path": None,
+                "source_image_artifact_hash": None,
+                "n_rows": 0,
+                "rows": (),
+                "unexpected": "value",
             }
         )
 
