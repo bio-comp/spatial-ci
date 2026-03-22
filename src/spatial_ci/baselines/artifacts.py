@@ -2,6 +2,7 @@
 
 import json
 from enum import Enum
+from math import isfinite
 from pathlib import Path
 
 import pyarrow as pa
@@ -47,6 +48,7 @@ class BaselinePredictionArtifact(BaseModel):
     source_score_artifact_hash: str = Field(min_length=1)
     source_manifest_path: str = Field(min_length=1)
     source_manifest_hash: str = Field(min_length=1)
+    ridge_probe_selected_alpha_by_program: dict[str, float] | None = None
     n_rows: int = Field(ge=0)
     rows: tuple[BaselinePredictionRow, ...]
 
@@ -54,6 +56,41 @@ class BaselinePredictionArtifact(BaseModel):
     def validate_row_count(self) -> "BaselinePredictionArtifact":
         if self.n_rows != len(self.rows):
             raise ValueError("n_rows must match len(rows)")
+        ridge_programs = {
+            row.program_name
+            for row in self.rows
+            if row.baseline_name is BaselineName.RIDGE_PROBE
+        }
+        if not ridge_programs:
+            if self.ridge_probe_selected_alpha_by_program is not None:
+                raise ValueError(
+                    "ridge_probe_selected_alpha_by_program must be None when no "
+                    "ridge_probe rows are present"
+                )
+            return self
+
+        selected_alpha_by_program = self.ridge_probe_selected_alpha_by_program
+        if selected_alpha_by_program is None:
+            raise ValueError(
+                "ridge_probe_selected_alpha_by_program is required when ridge_probe "
+                "rows are present"
+            )
+        if set(selected_alpha_by_program) != ridge_programs:
+            raise ValueError(
+                "ridge_probe_selected_alpha_by_program must match the predicted "
+                "ridge_probe program set"
+            )
+        invalid_programs = sorted(
+            program_name
+            for program_name, alpha in selected_alpha_by_program.items()
+            if not isfinite(alpha) or alpha <= 0.0
+        )
+        if invalid_programs:
+            invalid_display = ", ".join(invalid_programs)
+            raise ValueError(
+                "ridge_probe_selected_alpha_by_program must contain positive finite "
+                f"alpha values; invalid programs: {invalid_display}"
+            )
         return self
 
 
