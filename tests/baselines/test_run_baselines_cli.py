@@ -55,7 +55,7 @@ def _write_inputs(score_path: Path, manifest_path: Path) -> None:
                     sample_id="s1",
                     program_name="HALLMARK_HYPOXIA",
                     status=ScoreStatus.OK,
-                    raw_rank_evidence=0.2,
+                    raw_rank_evidence=0.0,
                     signature_size_declared=10,
                     signature_size_matched=10,
                     signature_coverage=1.0,
@@ -66,7 +66,7 @@ def _write_inputs(score_path: Path, manifest_path: Path) -> None:
                     sample_id="s2",
                     program_name="HALLMARK_HYPOXIA",
                     status=ScoreStatus.OK,
-                    raw_rank_evidence=0.6,
+                    raw_rank_evidence=1.0,
                     signature_size_declared=10,
                     signature_size_matched=10,
                     signature_coverage=1.0,
@@ -77,7 +77,18 @@ def _write_inputs(score_path: Path, manifest_path: Path) -> None:
                     sample_id="s3",
                     program_name="HALLMARK_HYPOXIA",
                     status=ScoreStatus.OK,
-                    raw_rank_evidence=0.0,
+                    raw_rank_evidence=0.2,
+                    signature_size_declared=10,
+                    signature_size_matched=10,
+                    signature_coverage=1.0,
+                    dropped_by_missingness_rule=False,
+                ),
+                ScorePacket(
+                    observation_id="obs-4",
+                    sample_id="s4",
+                    program_name="HALLMARK_HYPOXIA",
+                    status=ScoreStatus.OK,
+                    raw_rank_evidence=0.5,
                     signature_size_declared=10,
                     signature_size_matched=10,
                     signature_coverage=1.0,
@@ -91,7 +102,8 @@ def _write_inputs(score_path: Path, manifest_path: Path) -> None:
         [
             {"sample_id": "s1", "cohort_id": "cohort-a", "split": "train"},
             {"sample_id": "s2", "cohort_id": "cohort-a", "split": "train"},
-            {"sample_id": "s3", "cohort_id": "external-b", "split": "test_external"},
+            {"sample_id": "s3", "cohort_id": "cohort-a", "split": "val"},
+            {"sample_id": "s4", "cohort_id": "external-b", "split": "test_external"},
         ]
     ).write_parquet(manifest_path)
 
@@ -104,22 +116,27 @@ def _write_embedding_inputs(embedding_path: Path) -> None:
             encoder_version="1.0.0",
             source_image_artifact_path="images.parquet",
             source_image_artifact_hash="d" * 64,
-            n_rows=3,
+            n_rows=4,
             rows=(
                 EmbeddingArtifactRow(
                     observation_id="obs-1",
                     sample_id="s1",
-                    embedding=(0.1, 0.2),
+                    embedding=(1.0,),
                 ),
                 EmbeddingArtifactRow(
                     observation_id="obs-2",
                     sample_id="s2",
-                    embedding=(0.2, 0.3),
+                    embedding=(2.0,),
                 ),
                 EmbeddingArtifactRow(
                     observation_id="obs-3",
                     sample_id="s3",
-                    embedding=(0.3, 0.4),
+                    embedding=(1.2,),
+                ),
+                EmbeddingArtifactRow(
+                    observation_id="obs-4",
+                    sample_id="s4",
+                    embedding=(1.5,),
                 ),
             ),
         ),
@@ -158,7 +175,7 @@ def test_run_baselines_cli_writes_prediction_artifact(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert output_path.exists()
     artifact = read_baseline_prediction_artifact(output_path)
-    assert artifact.n_rows == 6
+    assert artifact.n_rows == 8
 
 
 def test_run_baselines_cli_writes_mean_and_knn_predictions_with_embeddings(
@@ -198,11 +215,15 @@ def test_run_baselines_cli_writes_mean_and_knn_predictions_with_embeddings(
     assert result.exit_code == 0
     assert output_path.exists()
     artifact = read_baseline_prediction_artifact(output_path)
-    assert artifact.n_rows == 9
+    assert artifact.n_rows == 16
     assert {row.baseline_name for row in artifact.rows} == {
         BaselineName.GLOBAL_TRAIN_MEAN,
         BaselineName.MEAN_BY_TRAIN_COHORT,
         BaselineName.KNN_ON_EMBEDDINGS,
+        BaselineName.RIDGE_PROBE,
+    }
+    assert artifact.ridge_probe_selected_alpha_by_program == {
+        "HALLMARK_HYPOXIA": 0.1
     }
 
 

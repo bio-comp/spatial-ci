@@ -6,6 +6,7 @@ from math import isfinite
 from typing import TypedDict, cast
 
 import numpy as np
+import numpy.typing as npt
 import polars as pl
 
 from spatial_ci.baselines.artifacts import BaselineName
@@ -21,6 +22,7 @@ REQUIRED_COLUMNS = {
 }
 
 DEFAULT_ALPHAS = (0.1, 1.0, 10.0)
+FloatArray = npt.NDArray[np.float64]
 
 
 class _RidgeRow(TypedDict):
@@ -49,7 +51,7 @@ def _validated_alphas(alphas: tuple[float, ...]) -> tuple[float, ...]:
     return tuple(sorted(alphas))
 
 
-def _embedding_matrix(rows: list[_RidgeRow], *, program_name: str) -> np.ndarray:
+def _embedding_matrix(rows: list[_RidgeRow], *, program_name: str) -> FloatArray:
     embeddings = np.asarray([row["embedding"] for row in rows], dtype=float)
     if embeddings.ndim != 2:
         raise ValueError(f"program {program_name} has malformed embedding rows")
@@ -57,39 +59,46 @@ def _embedding_matrix(rows: list[_RidgeRow], *, program_name: str) -> np.ndarray
         raise ValueError(f"program {program_name} has empty embedding vectors")
     if not np.isfinite(embeddings).all():
         raise ValueError(f"program {program_name} has non-finite embedding values")
-    return embeddings
+    return cast("FloatArray", embeddings)
 
 
-def _response_vector(rows: list[_RidgeRow]) -> np.ndarray:
-    return np.asarray([row["raw_rank_evidence"] for row in rows], dtype=float)
+def _response_vector(rows: list[_RidgeRow]) -> FloatArray:
+    return cast(
+        "FloatArray",
+        np.asarray([row["raw_rank_evidence"] for row in rows], dtype=float),
+    )
 
 
 def _standardize(
-    train_matrix: np.ndarray, matrix: np.ndarray
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    train_matrix: FloatArray, matrix: FloatArray
+) -> tuple[FloatArray, FloatArray, FloatArray]:
     means = train_matrix.mean(axis=0)
     scales = train_matrix.std(axis=0)
     scales[scales == 0.0] = 1.0
-    return (train_matrix - means) / scales, (matrix - means) / scales, means
+    return (
+        cast("FloatArray", (train_matrix - means) / scales),
+        cast("FloatArray", (matrix - means) / scales),
+        cast("FloatArray", means),
+    )
 
 
 def _ridge_coefficients(
-    standardized_train: np.ndarray, responses: np.ndarray, *, alpha: float
-) -> np.ndarray:
+    standardized_train: FloatArray, responses: FloatArray, *, alpha: float
+) -> FloatArray:
     design = np.column_stack([np.ones(standardized_train.shape[0]), standardized_train])
     penalty = np.eye(design.shape[1], dtype=float)
     penalty[0, 0] = 0.0
     system = design.T @ design + (alpha * penalty)
     rhs = design.T @ responses
     try:
-        return np.linalg.solve(system, rhs)
+        return cast("FloatArray", np.linalg.solve(system, rhs))
     except np.linalg.LinAlgError:
-        return np.linalg.pinv(system) @ rhs
+        return cast("FloatArray", np.linalg.pinv(system) @ rhs)
 
 
-def _ridge_predict(standardized: np.ndarray, coefficients: np.ndarray) -> np.ndarray:
+def _ridge_predict(standardized: FloatArray, coefficients: FloatArray) -> FloatArray:
     design = np.column_stack([np.ones(standardized.shape[0]), standardized])
-    return design @ coefficients
+    return cast("FloatArray", design @ coefficients)
 
 
 def _program_predictions(
