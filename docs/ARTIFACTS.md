@@ -396,6 +396,8 @@ Stores the raw predictions emitted by a run.
 - `program_name`
 - predicted score
 - for baseline outputs: `baseline_name`
+- for baseline artifacts: any required baseline-family metadata such as
+  `ridge_probe_selected_alpha_by_program`
 - recommended context: `cohort_id`, `split`
 - optional auxiliary outputs such as uncertainty or latent features
 
@@ -403,6 +405,10 @@ Stores the raw predictions emitted by a run.
 
 The evaluation layer should not have to rerun the model to inspect predictions.
 Predictions should be explicit artifacts.
+
+For the frozen baseline stack, one prediction artifact may contain multiple
+baseline families as long as row-level `baseline_name` stays explicit and any
+artifact-level baseline metadata is recorded alongside it.
 
 ---
 

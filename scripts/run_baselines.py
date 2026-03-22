@@ -40,7 +40,10 @@ from spatial_ci.baselines.runner import run_mean_baselines
     "--embeddings",
     type=Path,
     required=False,
-    help="Optional path to embedding artifact",
+    help=(
+        "Optional path to embedding artifact; enables knn_on_embeddings and "
+        "ridge_probe"
+    ),
 )
 def main(
     scores: Path,
@@ -52,7 +55,7 @@ def main(
     manifest_id: str | None,
     embeddings: Path | None,
 ) -> None:
-    """Run the mean-baseline foundation against frozen score and manifest inputs."""
+    """Run the frozen deployable baseline stack against score and manifest inputs."""
 
     artifact = run_mean_baselines(
         score_artifact_path=scores,
