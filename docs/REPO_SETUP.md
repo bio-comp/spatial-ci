@@ -456,14 +456,21 @@ Each should:
 
 Current baseline note:
 
-- `run_baselines.py` currently covers the mean-baseline foundation
-  (`global_train_mean` and `mean_by_train_cohort`)
+- `run_baselines.py` currently covers the frozen deployable baseline stack
+  implemented so far:
+  - `global_train_mean`
+  - `mean_by_train_cohort`
 - it consumes an explicit score artifact plus manifest parquet
-- `--embeddings <path>` enables the frozen `knn_on_embeddings` baseline on the
-  same joined score rows; omit it to run mean baselines only
+- `--embeddings <path>` enables the frozen embedding-space baselines on the
+  same joined score rows:
+  - `knn_on_embeddings`
+  - `ridge_probe`
+- `ridge_probe` uses train-only standardization, tunes alpha on `val`, and
+  records `ridge_probe_selected_alpha_by_program` in the output artifact
+- omit `--embeddings` to run mean baselines only
 - the embeddings artifact must carry `observation_id`, `sample_id`, and
   finite embedding vectors at a single consistent dimensionality
-- embedding baselines and evaluation certificates are follow-up slices
+- evaluation certificates are the next follow-up slice
 
 ## 18. Logging policy
 

@@ -15,6 +15,7 @@ from spatial_ci.baselines.mean import (
     predict_global_train_mean,
     predict_mean_by_train_cohort,
 )
+from spatial_ci.baselines.ridge import predict_ridge_probe
 from spatial_ci.embeddings.artifacts import read_embedding_artifact
 from spatial_ci.scoring.artifacts import read_score_artifact
 
@@ -169,11 +170,16 @@ def run_mean_baselines(
         predict_global_train_mean(joined),
         predict_mean_by_train_cohort(joined),
     ]
+    ridge_probe_selected_alpha_by_program: dict[str, float] | None = None
     if embedding_artifact_path is not None:
         joined_with_embeddings = _joined_embedding_frame(
             joined,
             _embedding_frame(embedding_artifact_path),
         )
+        ridge_predictions, ridge_probe_selected_alpha_by_program = (
+            predict_ridge_probe(joined_with_embeddings)
+        )
+        prediction_frames.append(ridge_predictions)
         prediction_frames.append(predict_knn_on_embeddings(joined_with_embeddings))
     prediction_frame = pl.concat(prediction_frames, how="vertical")
     rows = _prediction_rows(prediction_frame)
@@ -188,6 +194,7 @@ def run_mean_baselines(
         source_score_artifact_hash=_hash_file(score_artifact_path),
         source_manifest_path=str(manifest_path),
         source_manifest_hash=_hash_file(manifest_path),
+        ridge_probe_selected_alpha_by_program=ridge_probe_selected_alpha_by_program,
         n_rows=len(rows),
         rows=rows,
     )

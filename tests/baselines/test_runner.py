@@ -31,7 +31,7 @@ def _score_artifact(
             sample_id="s1",
             program_name="HALLMARK_HYPOXIA",
             status=ScoreStatus.OK,
-            raw_rank_evidence=0.2,
+            raw_rank_evidence=0.0,
             signature_size_declared=10,
             signature_size_matched=10,
             signature_coverage=1.0,
@@ -42,7 +42,7 @@ def _score_artifact(
             sample_id="s2",
             program_name="HALLMARK_HYPOXIA",
             status=ScoreStatus.OK,
-            raw_rank_evidence=0.6,
+            raw_rank_evidence=1.0,
             signature_size_declared=10,
             signature_size_matched=10,
             signature_coverage=1.0,
@@ -53,7 +53,7 @@ def _score_artifact(
             sample_id=sample_id_obs3,
             program_name="HALLMARK_HYPOXIA",
             status=ScoreStatus.OK,
-            raw_rank_evidence=0.1,
+            raw_rank_evidence=0.2,
             signature_size_declared=10,
             signature_size_matched=10,
             signature_coverage=1.0,
@@ -61,10 +61,10 @@ def _score_artifact(
         ),
         ScorePacket(
             observation_id="obs-4",
-            sample_id="s4" if include_missing_manifest_row else "s3",
+            sample_id="s5" if include_missing_manifest_row else "s4",
             program_name="HALLMARK_HYPOXIA",
             status=ScoreStatus.OK,
-            raw_rank_evidence=0.0,
+            raw_rank_evidence=0.5,
             signature_size_declared=10,
             signature_size_matched=10,
             signature_coverage=1.0,
@@ -89,28 +89,31 @@ def _score_artifact(
     )
 
 
-def _write_manifest(path: Path, *, duplicate_sample_id: bool = False) -> None:
+def _write_manifest(
+    path: Path,
+    *,
+    duplicate_sample_id: bool = False,
+    split_by_sample: dict[str, str] | None = None,
+) -> None:
+    if split_by_sample is None:
+        split_by_sample = {
+            "s1": "train",
+            "s2": "train",
+            "s3": "val",
+            "s4": "test_external",
+        }
     rows = [
         {
-            "sample_id": "s1",
-            "cohort_id": "cohort-a",
-            "split": "train",
-        },
-        {
-            "sample_id": "s2",
-            "cohort_id": "cohort-a",
-            "split": "train",
-        },
-        {
-            "sample_id": "s3",
-            "cohort_id": "external-b",
-            "split": "test_external",
-        },
+            "sample_id": sample_id,
+            "cohort_id": "external-b" if split == "test_external" else "cohort-a",
+            "split": split,
+        }
+        for sample_id, split in split_by_sample.items()
     ]
     if duplicate_sample_id:
         rows.append(
             {
-                "sample_id": "s3",
+                "sample_id": "s4",
                 "cohort_id": "external-b",
                 "split": "test_external",
             }
@@ -129,32 +132,32 @@ def _write_embedding_artifact(
         EmbeddingArtifactRow.model_construct(
             observation_id="obs-1",
             sample_id="s1",
-            embedding=(0.1, 0.2),
+            embedding=(1.0,),
         ),
         EmbeddingArtifactRow.model_construct(
             observation_id="obs-2",
             sample_id="s2",
-            embedding=(0.3, 0.4, 0.5) if inconsistent_dimensions else (0.3, 0.4),
+            embedding=(2.0, 3.0) if inconsistent_dimensions else (2.0,),
         ),
         EmbeddingArtifactRow.model_construct(
             observation_id="obs-3",
             sample_id="s3",
-            embedding=(0.5, 0.6),
+            embedding=(1.2,),
         ),
     ]
     if include_obs4:
         rows.append(
             EmbeddingArtifactRow.model_construct(
                 observation_id="obs-4",
-                sample_id="s3",
-                embedding=(0.7, 0.8),
+                sample_id="s4",
+                embedding=(1.5,),
             )
         )
     if duplicate_observation_id:
         rows[-1] = EmbeddingArtifactRow.model_construct(
             observation_id="obs-3",
             sample_id="s3",
-            embedding=(0.7, 0.8),
+            embedding=(1.5,),
         )
     artifact = EmbeddingArtifact.model_construct(
         alignment_contract_id="alignment-v1",
@@ -218,17 +221,28 @@ def test_run_mean_baselines_writes_mean_and_knn_predictions_with_embeddings(
     )
 
     assert output_path.exists()
-    assert artifact.n_rows == 12
+    assert artifact.n_rows == 16
     assert {row.baseline_name for row in artifact.rows} == {
         BaselineName.GLOBAL_TRAIN_MEAN,
         BaselineName.MEAN_BY_TRAIN_COHORT,
         BaselineName.KNN_ON_EMBEDDINGS,
+        BaselineName.RIDGE_PROBE,
+    }
+    assert artifact.ridge_probe_selected_alpha_by_program == {
+        "HALLMARK_HYPOXIA": 0.1
     }
     assert len(
         [
             row
             for row in artifact.rows
             if row.baseline_name is BaselineName.KNN_ON_EMBEDDINGS
+        ]
+    ) == 4
+    assert len(
+        [
+            row
+            for row in artifact.rows
+            if row.baseline_name is BaselineName.RIDGE_PROBE
         ]
     ) == 4
 
@@ -325,10 +339,75 @@ def test_run_mean_baselines_without_embeddings_preserves_mean_only_behavior(
     )
 
     assert artifact.n_rows == 8
+    assert artifact.ridge_probe_selected_alpha_by_program is None
     assert {row.baseline_name for row in artifact.rows} == {
         BaselineName.GLOBAL_TRAIN_MEAN,
         BaselineName.MEAN_BY_TRAIN_COHORT,
     }
+
+
+def test_run_mean_baselines_with_embeddings_rejects_program_without_val_rows(
+    tmp_path: Path,
+) -> None:
+    score_path = tmp_path / "scores.parquet"
+    manifest_path = tmp_path / "manifest.parquet"
+    embedding_path = tmp_path / "embeddings.parquet"
+    output_path = tmp_path / "baseline_predictions.parquet"
+    write_score_artifact(_score_artifact(), score_path)
+    _write_manifest(
+        manifest_path,
+        split_by_sample={
+            "s1": "train",
+            "s2": "train",
+            "s3": "test_external",
+            "s4": "test_external",
+        },
+    )
+    _write_embedding_artifact(embedding_path)
+
+    with pytest.raises(ValueError, match="no val rows"):
+        run_mean_baselines(
+            score_artifact_path=score_path,
+            manifest_path=manifest_path,
+            output_path=output_path,
+            run_id="baseline-run-1",
+            baseline_contract_id="mean_baselines_v0",
+            split_contract_id="breast_visium_split_v1",
+            manifest_id="manifest-v1",
+            embedding_artifact_path=embedding_path,
+        )
+
+
+def test_run_mean_baselines_with_embeddings_rejects_program_with_too_few_train_rows(
+    tmp_path: Path,
+) -> None:
+    score_path = tmp_path / "scores.parquet"
+    manifest_path = tmp_path / "manifest.parquet"
+    embedding_path = tmp_path / "embeddings.parquet"
+    output_path = tmp_path / "baseline_predictions.parquet"
+    write_score_artifact(_score_artifact(), score_path)
+    _write_manifest(
+        manifest_path,
+        split_by_sample={
+            "s1": "train",
+            "s2": "val",
+            "s3": "test_external",
+            "s4": "test_external",
+        },
+    )
+    _write_embedding_artifact(embedding_path)
+
+    with pytest.raises(ValueError, match="fewer than 2 train rows"):
+        run_mean_baselines(
+            score_artifact_path=score_path,
+            manifest_path=manifest_path,
+            output_path=output_path,
+            run_id="baseline-run-1",
+            baseline_contract_id="mean_baselines_v0",
+            split_contract_id="breast_visium_split_v1",
+            manifest_id="manifest-v1",
+            embedding_artifact_path=embedding_path,
+        )
 
 
 def test_run_mean_baselines_rejects_missing_sample_id_on_ok_score_row(
