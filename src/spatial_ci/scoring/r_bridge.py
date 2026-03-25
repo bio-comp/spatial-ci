@@ -1,6 +1,8 @@
 """File-based bridge between Python policy code and the R scorer."""
 
 import json
+import os
+import signal
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +31,9 @@ class InvalidScorerOutputError(RuntimeError):
     """Raised when the R scorer output artifact is malformed."""
 
 
+R_SCRIPT_TIMEOUT_SECONDS = 300
+
+
 def build_bridge_paths(workdir: Path) -> BridgePaths:
     """Build the deterministic bridge file layout inside a workdir."""
 
@@ -42,27 +47,77 @@ def build_bridge_paths(workdir: Path) -> BridgePaths:
     )
 
 
-def run_r_script(
-    paths: BridgePaths, *, repo_root: Path
-) -> subprocess.CompletedProcess[str]:
-    """Invoke the canonical R scorer with the explicit bridge inputs."""
+def _reap_orphaned_r_scorer_processes() -> None:
+    """Terminate orphaned score_targets.R processes from interrupted runs."""
 
-    completed = subprocess.run(
-        [
-            "Rscript",
-            "scripts/score_targets.R",
-            str(paths.expression_input),
-            str(paths.signature_input),
-            str(paths.scoring_request),
-            str(paths.detected_membership),
-            str(paths.score_output),
-            str(paths.runtime_metadata),
-        ],
-        cwd=repo_root,
+    listing = subprocess.run(
+        ["ps", "-Ao", "pid,ppid,command"],
         capture_output=True,
         text=True,
         check=False,
     )
+    if listing.returncode != 0:
+        return
+
+    orphan_pids: list[int] = []
+    for line in listing.stdout.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        parts = stripped.split(maxsplit=2)
+        if len(parts) < 3:
+            continue
+        pid_text, ppid_text, command = parts
+        if ppid_text != "1":
+            continue
+        if "scripts/score_targets.R" not in command:
+            continue
+        try:
+            orphan_pids.append(int(pid_text))
+        except ValueError:
+            continue
+
+    for pid in orphan_pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except (PermissionError, ProcessLookupError):
+            continue
+
+
+def run_r_script(
+    paths: BridgePaths,
+    *,
+    repo_root: Path,
+    timeout_seconds: int = R_SCRIPT_TIMEOUT_SECONDS,
+) -> subprocess.CompletedProcess[str]:
+    """Invoke the canonical R scorer with the explicit bridge inputs."""
+
+    if timeout_seconds < 1:
+        raise ValueError("timeout_seconds must be at least 1")
+
+    _reap_orphaned_r_scorer_processes()
+    try:
+        completed = subprocess.run(
+            [
+                "Rscript",
+                "scripts/score_targets.R",
+                str(paths.expression_input),
+                str(paths.signature_input),
+                str(paths.scoring_request),
+                str(paths.detected_membership),
+                str(paths.score_output),
+                str(paths.runtime_metadata),
+            ],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RSubprocessError(
+            f"R scorer timed out after {timeout_seconds}s."
+        ) from exc
 
     if completed.returncode != 0:
         raise RSubprocessError(completed.stderr.strip() or "R scorer failed.")

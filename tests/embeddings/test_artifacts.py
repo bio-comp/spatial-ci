@@ -179,6 +179,41 @@ def test_embedding_artifact_requires_row_sample_id_and_metadata_fields() -> None
         )
 
 
+def test_embedding_artifact_requires_complete_non_empty_source_provenance() -> None:
+    with pytest.raises(ValidationError, match="source_image_artifact_path"):
+        EmbeddingArtifact(
+            alignment_contract_id="alignment-v1",
+            encoder_name="clip-vit-b32",
+            encoder_version="1.0.0",
+            source_image_artifact_path="",
+            source_image_artifact_hash="a" * 64,
+            n_rows=0,
+            rows=(),
+        )
+
+    with pytest.raises(ValidationError, match="source_image_artifact_hash"):
+        EmbeddingArtifact(
+            alignment_contract_id="alignment-v1",
+            encoder_name="clip-vit-b32",
+            encoder_version="1.0.0",
+            source_image_artifact_path="images/source.tiff",
+            source_image_artifact_hash=None,
+            n_rows=0,
+            rows=(),
+        )
+
+    with pytest.raises(ValidationError, match="source_image_artifact_path"):
+        EmbeddingArtifact(
+            alignment_contract_id="alignment-v1",
+            encoder_name="clip-vit-b32",
+            encoder_version="1.0.0",
+            source_image_artifact_path=None,
+            source_image_artifact_hash="a" * 64,
+            n_rows=0,
+            rows=(),
+        )
+
+
 def test_embedding_artifact_rejects_unexpected_row_and_metadata_keys() -> None:
     with pytest.raises(ValidationError, match="extra"):
         EmbeddingArtifactRow.model_validate(

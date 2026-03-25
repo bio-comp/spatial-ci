@@ -1,4 +1,5 @@
 import json
+import signal
 import subprocess
 from pathlib import Path
 
@@ -33,6 +34,11 @@ def test_bridge_paths_are_explicit_and_stable(tmp_path: Path) -> None:
 def test_nonzero_r_exit_maps_to_subprocess_error(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    monkeypatch.setattr(
+        "spatial_ci.scoring.r_bridge._reap_orphaned_r_scorer_processes",
+        lambda: None,
+    )
+
     def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(
             args=["Rscript"],
@@ -45,6 +51,92 @@ def test_nonzero_r_exit_maps_to_subprocess_error(
 
     with pytest.raises(RSubprocessError, match="scorer blew up"):
         run_r_script(build_bridge_paths(tmp_path), repo_root=tmp_path)
+
+
+def test_timeout_maps_to_subprocess_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        "spatial_ci.scoring.r_bridge._reap_orphaned_r_scorer_processes",
+        lambda: None,
+    )
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise subprocess.TimeoutExpired(cmd=["Rscript"], timeout=1)
+
+    monkeypatch.setattr("spatial_ci.scoring.r_bridge.subprocess.run", fake_run)
+
+    with pytest.raises(RSubprocessError, match="timed out"):
+        run_r_script(
+            build_bridge_paths(tmp_path),
+            repo_root=tmp_path,
+            timeout_seconds=1,
+        )
+
+
+def test_timeout_must_be_positive(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="timeout_seconds"):
+        run_r_script(
+            build_bridge_paths(tmp_path),
+            repo_root=tmp_path,
+            timeout_seconds=0,
+        )
+
+
+def test_reap_orphaned_r_scorer_processes_kills_only_matching_orphans(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sample_ps = "\n".join(
+        [
+            "101 1 /opt/homebrew/lib/R --file=scripts/score_targets.R --args foo",
+            "102 2 /opt/homebrew/lib/R --file=scripts/score_targets.R --args bar",
+            "103 1 /opt/homebrew/lib/R --file=scripts/bootstrap_renv.R",
+            "104 1 /opt/homebrew/lib/R --file=scripts/other.R",
+        ]
+    )
+    calls: list[tuple[int, int]] = []
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=["ps"],
+            returncode=0,
+            stdout=sample_ps,
+            stderr="",
+        )
+
+    def fake_kill(pid: int, sig: int) -> None:
+        calls.append((pid, sig))
+
+    monkeypatch.setattr("spatial_ci.scoring.r_bridge.subprocess.run", fake_run)
+    monkeypatch.setattr("spatial_ci.scoring.r_bridge.os.kill", fake_kill)
+
+    from spatial_ci.scoring.r_bridge import _reap_orphaned_r_scorer_processes
+
+    _reap_orphaned_r_scorer_processes()
+
+    assert calls == [(101, signal.SIGTERM)]
+
+
+def test_reap_ignores_unreadable_process_listing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=["ps"],
+            returncode=1,
+            stdout="",
+            stderr="denied",
+        )
+
+    def fail_kill(pid: int, sig: int) -> None:
+        raise AssertionError("kill should not be called when ps fails")
+
+    monkeypatch.setattr("spatial_ci.scoring.r_bridge.subprocess.run", fake_run)
+    monkeypatch.setattr("spatial_ci.scoring.r_bridge.os.kill", fail_kill)
+
+    from spatial_ci.scoring.r_bridge import _reap_orphaned_r_scorer_processes
+
+    _reap_orphaned_r_scorer_processes()
 
 
 def test_missing_required_output_column_maps_to_invalid_output(tmp_path: Path) -> None:

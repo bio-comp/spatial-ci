@@ -33,6 +33,30 @@ class EmbeddingArtifact(BaseModel):
 
     @model_validator(mode="after")
     def _validate_rows(self) -> "EmbeddingArtifact":
+        if self.source_image_artifact_path == "":
+            raise ValueError("source_image_artifact_path must be non-empty when set")
+
+        if self.source_image_artifact_hash == "":
+            raise ValueError("source_image_artifact_hash must be non-empty when set")
+
+        if (
+            self.source_image_artifact_path is None
+            and self.source_image_artifact_hash is not None
+        ):
+            raise ValueError(
+                "source_image_artifact_path is required when "
+                "source_image_artifact_hash is set"
+            )
+
+        if (
+            self.source_image_artifact_path is not None
+            and self.source_image_artifact_hash is None
+        ):
+            raise ValueError(
+                "source_image_artifact_hash is required when "
+                "source_image_artifact_path is set"
+            )
+
         if self.n_rows != len(self.rows):
             raise ValueError("n_rows must match len(rows)")
 
